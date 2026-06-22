@@ -1,0 +1,27 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Data (don't commit large files)
+data/raw/
+data/cache/
+*.csv
+*.pkl
+*.h5
+
+# Models (use DVC or releases instead)
+data/models/
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
