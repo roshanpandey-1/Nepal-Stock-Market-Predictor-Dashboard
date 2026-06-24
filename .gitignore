@@ -11,9 +11,11 @@ __pycache__/
 *.pyd
 .DS_Store
 
-# Data (raw + cache only)
+# Data
 data/raw/
+data/processed/
 data/cache/
+*.csv
 
 # Models
 data/models/
