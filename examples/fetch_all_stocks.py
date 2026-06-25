@@ -41,8 +41,9 @@ for i, company in enumerate(equity):
 
         df = ti.add_all(df)
         df = add_labels(df)
-        scraper.save(df, ticker)                                         # → data/raw/
-        df.to_csv(f'data/processed/{ticker}_features.csv', index=False) # → data/processed/
+        df['Sector'] = company['sectorName']  # ← added this line
+        scraper.save(df, ticker)
+        df.to_csv(f'data/processed/{ticker}_features.csv', index=False)
         success.append(ticker)
         logger.info(f"[{i+1}/{len(equity)}] {ticker}: {len(df)} rows saved")
 
