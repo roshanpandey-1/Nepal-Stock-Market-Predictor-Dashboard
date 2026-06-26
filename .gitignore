@@ -19,7 +19,6 @@ data/cache/
 
 # Models
 data/models/
-models/
 *.pkl
 *.h5
 *.joblib
