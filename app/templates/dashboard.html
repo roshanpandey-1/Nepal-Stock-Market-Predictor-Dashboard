@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · NEPSE Intelligence{% endblock %}
+{% block content %}
+
+<h1>NEPSE Sector Signals</h1>
+<p class="text-dim">Buy/Sell/Hold classifiers for {{ num_sectors }} NEPSE sectors, covering {{ num_tickers }} tickers.
+Accuracy figures are out-of-sample (last 3 months held out from training).</p>
+
+<div class="limitation-note mb-4">
+  ⚠️ <strong>Known limitation:</strong> 6 of 8 sector models default heavily to predicting "Hold" on unseen
+  data and aren't currently generating reliable Buy/Sell signals. See the
+  <a href="https://github.com/roshanpandey-1/Nepal-Stock-Market-Predictor-Dashboard#-model-performance" target="_blank">README</a>
+  for full details before treating any signal below as advice.
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-tile">
+      <div class="label">Tickers Tracked</div>
+      <div class="value">{{ num_tickers }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-tile">
+      <div class="label">Sectors Modeled</div>
+      <div class="value">{{ num_sectors }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-tile">
+      <div class="label">Latest Market Sentiment</div>
+      <div class="value">
+        {% if latest_sentiment %}
+          {{ "%.2f"|format(latest_sentiment.avg_sentiment|float) }}
+        {% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-tile">
+      <div class="label">Best Sector (Sharpe)</div>
+      <div class="value" style="font-size:1.1rem;">
+        {% set best = backtest_rows|sort(attribute='sharpe_ratio', reverse=True)|first %}
+        {{ best.sector if best else '—' }}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card-panel">
+  <h3>Look up a ticker</h3>
+  <form action="#" onsubmit="event.preventDefault(); const t = document.getElementById('ticker-select').value; if (t) window.location = '/stock/' + t;">
+    <div class="d-flex gap-2">
+      <select id="ticker-select" class="form-select" style="max-width:280px;">
+        <option value="">Select a ticker…</option>
+        {% for t in tickers %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-primary" type="submit">View</button>
+    </div>
+  </form>
+</div>
+
+<div class="card-panel">
+  <h3>Sector Model Summary</h3>
+  <table class="data-table">
+    <thead>
+      <tr><th>Sector</th><th>Model</th><th>ML Return</th><th>Buy &amp; Hold</th><th>Sharpe</th></tr>
+    </thead>
+    <tbody>
+      {% for r in backtest_rows|sort(attribute='sharpe_ratio', reverse=True) %}
+      <tr>
+        <td>{{ r.sector }}</td>
+        <td>{{ r.model_type }}</td>
+        <td class="{{ 'pos' if r.ml_return_pct >= 0 else 'neg' }}">{{ r.ml_return_pct }}%</td>
+        <td class="{{ 'pos' if r.bnh_return_pct >= 0 else 'neg' }}">{{ r.bnh_return_pct }}%</td>
+        <td>{{ r.sharpe_ratio }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="text-dim mt-2" style="font-size:0.85rem;">Full backtest detail on the <a href="{{ url_for('main.backtest') }}">Backtest</a> page.</p>
+</div>
+
+{% endblock %}

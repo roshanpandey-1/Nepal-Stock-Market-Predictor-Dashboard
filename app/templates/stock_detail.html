@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ ticker }} · NEPSE Intelligence{% endblock %}
+{% block content %}
+
+<h1>{{ ticker }}</h1>
+<p class="text-dim">Sector: {{ sector }}</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-4">
+    <div class="stat-tile">
+      <div class="label">Latest Model Signal</div>
+      <div class="value" id="signal-badge">Loading…</div>
+      <div class="text-dim mt-1" style="font-size:0.8rem;" id="signal-confidence"></div>
+    </div>
+  </div>
+  <div class="col-12 col-md-8">
+    <div class="limitation-note" style="margin-bottom:0;">
+      This signal comes from the sector's out-of-sample model (see <a href="{{ url_for('main.backtest') }}">Backtest</a>).
+      For most sectors it currently leans heavily toward "Hold" on unseen data — treat it as illustrative, not
+      as trading advice.
+    </div>
+  </div>
+</div>
+
+<div class="card-panel">
+  <h3>Price History</h3>
+  <canvas id="price-chart" height="90"></canvas>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  loadStockDetail("{{ ticker }}");
+</script>
+{% endblock %}

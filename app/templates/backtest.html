@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Backtest · NEPSE Intelligence{% endblock %}
+{% block content %}
+
+<h1>Out-of-Sample Backtest</h1>
+<p class="text-dim">Each sector's saved model was applied to its most-complete ticker over a holdout period
+(last 3 months, never seen during training) and compared against a simple Buy-and-Hold benchmark starting
+from the same date, with 100,000 in simulated capital.</p>
+
+<div class="card-panel">
+  <canvas id="backtest-chart" height="90"></canvas>
+</div>
+
+<div class="card-panel">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Sector</th><th>Model</th><th>Ticker</th><th>Holdout From</th>
+        <th>ML Return</th><th>B&amp;H Return</th><th>Sharpe</th><th>Max Drawdown</th>
+        <th>Win Rate</th><th>Trades</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.sector }}</td>
+        <td>{{ r.model_type }}</td>
+        <td>{{ r.ticker }}</td>
+        <td>{{ r.holdout_start }}</td>
+        <td class="{{ 'pos' if r.ml_return_pct >= 0 else 'neg' }}">{{ r.ml_return_pct }}%</td>
+        <td class="{{ 'pos' if r.bnh_return_pct >= 0 else 'neg' }}">{{ r.bnh_return_pct }}%</td>
+        <td>{{ r.sharpe_ratio }}</td>
+        <td class="neg">{{ r.max_drawdown_pct }}%</td>
+        <td>{{ r.win_rate_pct }}%</td>
+        <td>{{ r.num_trades }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="limitation-note">
+  ⚠️ Several rows show 0 trades and a flat 0% return — that's the model predicting "Hold" for the entire
+  holdout window rather than a data problem. See the README's Known Limitations section.
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  const backtestData = {{ rows|tojson }};
+  renderBacktestChart('backtest-chart', backtestData);
+</script>
+{% endblock %}

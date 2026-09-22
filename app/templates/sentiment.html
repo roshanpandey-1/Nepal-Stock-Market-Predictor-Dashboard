@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Sentiment · NEPSE Intelligence{% endblock %}
+{% block content %}
+
+<h1>Market Sentiment</h1>
+<p class="text-dim">FinBERT sentiment scores over NEPSE-related news headlines from Sharesansar, aggregated
+daily. This is market-wide, not per-stock — per-ticker news matching was tried and found unreliable during
+scraping, so it isn't split out per ticker.</p>
+
+<div class="card-panel">
+  <canvas id="sentiment-chart" height="80"></canvas>
+</div>
+
+<div class="card-panel">
+  <h3>Recent Headlines</h3>
+  <table class="data-table">
+    <thead>
+      <tr><th>Date</th><th>Headline</th><th>Sentiment</th><th>Score</th></tr>
+    </thead>
+    <tbody>
+      {% for h in headlines %}
+      <tr>
+        <td style="white-space:nowrap;">{{ h.date }}</td>
+        <td><a href="{{ h.url }}" target="_blank" rel="noopener">{{ h.title }}</a></td>
+        <td>
+          {% if h.finbert_label == 'positive' %}
+            <span class="badge-pill badge-buy">Positive</span>
+          {% elif h.finbert_label == 'negative' %}
+            <span class="badge-pill badge-sell">Negative</span>
+          {% else %}
+            <span class="badge-pill badge-hold">Neutral</span>
+          {% endif %}
+        </td>
+        <td>{{ "%.2f"|format(h.finbert_score|float) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  const dailySentiment = {{ daily_rows|tojson }};
+  renderSentimentChart('sentiment-chart', dailySentiment);
+</script>
+{% endblock %}
