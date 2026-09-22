@@ -13,74 +13,149 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
   for full details before treating any signal below as advice.
 </div>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="stat-tile">
-      <div class="label">Tickers Tracked</div>
-      <div class="value">{{ num_tickers }}</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-tile">
-      <div class="label">Sectors Modeled</div>
-      <div class="value">{{ num_sectors }}</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-tile">
-      <div class="label">Latest Market Sentiment</div>
-      <div class="value">
-        {% if latest_sentiment %}
-          {{ "%.2f"|format(latest_sentiment.avg_sentiment|float) }}
-        {% else %}—{% endif %}
+<div class="row g-3">
+  <div class="col-lg-8">
+
+    <div class="row g-3 mb-1">
+      <div class="col-6 col-md-3">
+        <div class="stat-tile">
+          <div class="label">Tickers Tracked</div>
+          <div class="value">{{ num_tickers }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-tile">
+          <div class="label">Sectors Modeled</div>
+          <div class="value">{{ num_sectors }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-tile">
+          <div class="label">Market Sentiment</div>
+          <div class="value">
+            {% if latest_sentiment %}{{ "%.2f"|format(latest_sentiment.avg_sentiment|float) }}
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-tile">
+          <div class="label">Best Sector (Sharpe)</div>
+          <div class="value" style="font-size:1.1rem;">
+            {% set best = backtest_rows|sort(attribute='sharpe_ratio', reverse=True)|first %}
+            {{ best.sector if best else '—' }}
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-tile">
-      <div class="label">Best Sector (Sharpe)</div>
-      <div class="value" style="font-size:1.1rem;">
-        {% set best = backtest_rows|sort(attribute='sharpe_ratio', reverse=True)|first %}
-        {{ best.sector if best else '—' }}
+
+    <div class="card-panel mt-3">
+      <h3>Market Breadth (Latest Session)</h3>
+      <div class="breadth-row">
+        <div class="breadth-pill adv"><span class="n">{{ market_breadth.advancing }}</span>Advancing</div>
+        <div class="breadth-pill dec"><span class="n">{{ market_breadth.declining }}</span>Declining</div>
+        <div class="breadth-pill unc"><span class="n">{{ market_breadth.unchanged }}</span>Unchanged</div>
       </div>
     </div>
-  </div>
-</div>
 
-<div class="card-panel">
-  <h3>Look up a ticker</h3>
-  <form action="#" onsubmit="event.preventDefault(); const t = document.getElementById('ticker-select').value; if (t) window.location = '/stock/' + t;">
-    <div class="d-flex gap-2">
-      <select id="ticker-select" class="form-select" style="max-width:280px;">
-        <option value="">Select a ticker…</option>
-        {% for t in tickers %}
-        <option value="{{ t }}">{{ t }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-primary" type="submit">View</button>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card-panel" style="margin-bottom:0;">
+          <h3>Top Gainers</h3>
+          <table class="data-table">
+            <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th></tr></thead>
+            <tbody>
+              {% for m in top_gainers %}
+              <tr>
+                <td><a href="{{ url_for('main.stock_detail', ticker=m.ticker) }}">{{ m.ticker }}</a></td>
+                <td>{{ m.close }}</td>
+                <td class="pos">+{{ m.change_pct }}%</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="3" class="text-dim">No data</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card-panel" style="margin-bottom:0;">
+          <h3>Top Losers</h3>
+          <table class="data-table">
+            <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th></tr></thead>
+            <tbody>
+              {% for m in top_losers %}
+              <tr>
+                <td><a href="{{ url_for('main.stock_detail', ticker=m.ticker) }}">{{ m.ticker }}</a></td>
+                <td>{{ m.close }}</td>
+                <td class="neg">{{ m.change_pct }}%</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="3" class="text-dim">No data</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </form>
-</div>
 
-<div class="card-panel">
-  <h3>Sector Model Summary</h3>
-  <table class="data-table">
-    <thead>
-      <tr><th>Sector</th><th>Model</th><th>ML Return</th><th>Buy &amp; Hold</th><th>Sharpe</th></tr>
-    </thead>
-    <tbody>
-      {% for r in backtest_rows|sort(attribute='sharpe_ratio', reverse=True) %}
-      <tr>
-        <td>{{ r.sector }}</td>
-        <td>{{ r.model_type }}</td>
-        <td class="{{ 'pos' if r.ml_return_pct >= 0 else 'neg' }}">{{ r.ml_return_pct }}%</td>
-        <td class="{{ 'pos' if r.bnh_return_pct >= 0 else 'neg' }}">{{ r.bnh_return_pct }}%</td>
-        <td>{{ r.sharpe_ratio }}</td>
-      </tr>
+    <div class="card-panel">
+      <h3>Look up a ticker</h3>
+      <form action="#" onsubmit="event.preventDefault(); const t = document.getElementById('ticker-select').value; if (t) window.location = '/stock/' + t;">
+        <div class="d-flex gap-2">
+          <select id="ticker-select" class="form-select" style="max-width:280px;">
+            <option value="">Select a ticker…</option>
+            {% for t in tickers %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-primary" type="submit">View</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card-panel">
+      <h3>Sector Model Summary</h3>
+      <table class="data-table">
+        <thead>
+          <tr><th>Sector</th><th>Model</th><th>ML Return</th><th>Buy &amp; Hold</th><th>Sharpe</th></tr>
+        </thead>
+        <tbody>
+          {% for r in backtest_rows|sort(attribute='sharpe_ratio', reverse=True) %}
+          <tr>
+            <td>{{ r.sector }}</td>
+            <td>{{ r.model_type }}</td>
+            <td class="{{ 'pos' if r.ml_return_pct >= 0 else 'neg' }}">{{ r.ml_return_pct }}%</td>
+            <td class="{{ 'pos' if r.bnh_return_pct >= 0 else 'neg' }}">{{ r.bnh_return_pct }}%</td>
+            <td>{{ r.sharpe_ratio }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="text-dim mt-2" style="font-size:0.85rem;">Full backtest detail on the <a href="{{ url_for('main.backtest') }}">Backtest</a> page.</p>
+    </div>
+
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card-panel">
+      <h3>Recent Headlines</h3>
+      {% for h in recent_headlines %}
+      <div class="news-item">
+        <a class="headline" href="{{ h.url }}" target="_blank" rel="noopener">{{ h.title }}</a>
+        <span class="meta">
+          {{ h.date }} ·
+          {% if h.finbert_label == 'positive' %}<span class="pos">Positive</span>
+          {% elif h.finbert_label == 'negative' %}<span class="neg">Negative</span>
+          {% else %}Neutral{% endif %}
+        </span>
+      </div>
+      {% else %}
+      <p class="text-dim">No headlines available.</p>
       {% endfor %}
-    </tbody>
-  </table>
-  <p class="text-dim mt-2" style="font-size:0.85rem;">Full backtest detail on the <a href="{{ url_for('main.backtest') }}">Backtest</a> page.</p>
+      <p class="mt-2" style="font-size:0.85rem;"><a href="{{ url_for('main.sentiment') }}">View all sentiment →</a></p>
+    </div>
+  </div>
 </div>
 
 {% endblock %}

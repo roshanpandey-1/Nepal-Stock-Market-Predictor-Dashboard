@@ -50,7 +50,16 @@ def forecast(ticker):
         return jsonify({"ticker": ticker, "history": [], "status": "ticker not found"}), 404
 
     recent = rows[-180:]
-    history = [{"date": r["Date"], "close": float(r["Close"])} for r in recent if r.get("Close")]
+    history = []
+    for r in recent:
+        if not r.get("Close"):
+            continue
+        entry = {"date": r["Date"], "close": float(r["Close"])}
+        try:
+            entry["volume"] = float(r["Volume"])
+        except (KeyError, ValueError, TypeError):
+            entry["volume"] = None
+        history.append(entry)
     return jsonify({"ticker": ticker, "history": history, "status": "historical_only"})
 
 

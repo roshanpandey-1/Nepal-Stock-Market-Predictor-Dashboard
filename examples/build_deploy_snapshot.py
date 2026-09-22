@@ -43,6 +43,11 @@ def build_processed():
             w.writerows(trimmed)
 
     shutil.copy(ticker_list_path, OUT_PROCESSED / "ticker_list.txt")
+
+    company_names_path = PROCESSED / "company_names.json"
+    if company_names_path.exists():
+        shutil.copy(company_names_path, OUT_PROCESSED / "company_names.json")
+
     print(f"Trimmed {len(tickers)} ticker files to last {KEEP_ROWS} rows each")
 
 
