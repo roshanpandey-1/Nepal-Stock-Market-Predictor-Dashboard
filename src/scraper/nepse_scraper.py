@@ -3,7 +3,7 @@ NEPSE Stock Data Scraper
 Uses NepseUnofficialApi to fetch real OHLCV data
 """
 import pandas as pd
-from nepse import Nepse
+from nepse import NEPSE as Nepse  # pip package exports class NEPSE, not Nepse
 from loguru import logger
 from pathlib import Path
 
