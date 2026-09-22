@@ -12,6 +12,8 @@
 
 > Hosted on Render's free tier, which sleeps after 15 minutes of inactivity — the first request may take ~50 seconds to wake the instance.
 
+![NEPSE Intelligence dashboard](app/static/images/dashboard_preview.png)
+
 ---
 
 ## Overview
