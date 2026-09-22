@@ -1,0 +1,26 @@
+.git/
+.gitignore
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+env/
+.env
+.env.*
+
+# Full local data pipeline -- not needed to serve the dashboard, and the
+# whole point of deploy_data/ is to avoid shipping this into the image.
+data/
+notebooks/
+tests/
+
+# Training/scraping scripts -- not imported by app/
+examples/
+src/
+
+# Not needed inside the image
+README.md
+DEPLOYMENT.md
+render.yaml
+Procfile
+requirements.txt
