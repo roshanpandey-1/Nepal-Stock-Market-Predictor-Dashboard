@@ -150,7 +150,7 @@ logger.info(f"Total rows loaded: {len(data)}")
 
 # ── 3. Use only last 2 years of data ─────────────────────────
 data['Date'] = pd.to_datetime(data['Date'])
-cutoff = pd.Timestamp('2024-01-01')
+cutoff = pd.Timestamp.today() - pd.DateOffset(years=2)
 data = data[data['Date'] >= cutoff]
 logger.info(f"After 2-year filter: {len(data)} rows")
 

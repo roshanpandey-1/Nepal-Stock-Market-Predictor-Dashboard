@@ -4,8 +4,9 @@ Simulates trading using model signals on historical data
 Compares ML strategy vs Buy-and-Hold benchmark
 """
 import pandas as pd
-import numpy as np
 from loguru import logger
+
+from . import metrics
 
 
 class Backtester:
@@ -38,27 +39,21 @@ class Backtester:
         df["Portfolio_Value"] = portfolio_values
         df["BnH_Value"] = self.initial_capital * (df["Close"] / df["Close"].iloc[0])
 
-        return self._metrics(df)
+        return self._metrics(df, signal_col)
 
-    def _metrics(self, df: pd.DataFrame) -> dict:
+    def _metrics(self, df: pd.DataFrame, signal_col: str) -> dict:
         pv = df["Portfolio_Value"]
         bh = df["BnH_Value"]
 
-        total_return_ml  = (pv.iloc[-1] / self.initial_capital - 1) * 100
-        total_return_bnh = (bh.iloc[-1] / self.initial_capital - 1) * 100
-
-        daily_returns = pv.pct_change().dropna()
-        sharpe = (daily_returns.mean() / daily_returns.std()) * np.sqrt(252) if daily_returns.std() > 0 else 0
-
-        rolling_max = pv.cummax()
-        drawdown = (pv - rolling_max) / rolling_max
-        max_drawdown = drawdown.min() * 100
+        summary = metrics.summarize(df, self.initial_capital, signal_col=signal_col)
 
         return {
-            "ml_return_pct":    round(total_return_ml, 2),
-            "bnh_return_pct":   round(total_return_bnh, 2),
-            "sharpe_ratio":     round(sharpe, 3),
-            "max_drawdown_pct": round(max_drawdown, 2),
+            "ml_return_pct":    summary["total_return_pct"],
+            "bnh_return_pct":   round(metrics.total_return_pct(bh, self.initial_capital), 2),
+            "sharpe_ratio":     summary["sharpe_ratio"],
+            "max_drawdown_pct": summary["max_drawdown_pct"],
+            "win_rate_pct":     summary["win_rate_pct"],
+            "num_trades":       summary["num_trades"],
             "final_value":      round(pv.iloc[-1], 2),
             "df":               df
         }
