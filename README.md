@@ -1,75 +1,101 @@
 # 🇳🇵 NEPSE Intelligence Platform
 
-> An end-to-end Machine Learning platform for Nepal Stock Exchange (NEPSE) analysis — combining price forecasting, Buy/Sell/Hold signal classification, and financial news sentiment analysis in a single Flask web dashboard.
+**Sector-wise Buy/Sell/Hold signal models and news-sentiment analysis for the Nepal Stock Exchange, served through a live Flask dashboard.**
 
-![Dashboard Preview](app/static/images/dashboard_preview.png)
+[![Live Demo](https://img.shields.io/badge/demo-live-16a34a?style=flat-square)](https://nepse-intelligence-albt.onrender.com)
+[![Python](https://img.shields.io/badge/python-3.10-3776ab?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/flask-3.0-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![PyTorch](https://img.shields.io/badge/pytorch-2.1-ee4c2c?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Tests](https://img.shields.io/badge/tests-23%20passing-16a34a?style=flat-square)](tests/)
 
-## 🎯 What it does
+### 🔗 [**View the live dashboard →**](https://nepse-intelligence-albt.onrender.com)
+
+> Hosted on Render's free tier, which sleeps after 15 minutes of inactivity — the first request may take ~50 seconds to wake the instance.
+
+---
+
+## Overview
+
+NEPSE Intelligence is an end-to-end machine learning pipeline built around Nepal's stock market: it scrapes daily price data and financial news, engineers technical indicators, trains a separate classifier per market sector, evaluates them on a true out-of-sample holdout, and serves the results through an interactive dashboard.
+
+The project covers **260 tickers across 8 sectors**, and deliberately reports its results honestly — including [a significant limitation](#-known-limitation-majority-class-collapse) in the current models that most portfolio projects would quietly omit.
+
+## ✨ Features
 
 | Feature | Description |
 |---|---|
-| 📈 Price Forecasting | Prophet + LSTM models predict next 7-day stock prices |
-| 🟢 Signal Classification | XGBoost/LightGBM classify Buy / Sell / Hold signals |
-| 📰 News Sentiment | NLP pipeline scores financial news from Sharesansar & OnlineKhabar |
-| 💡 Explainability | SHAP values explain every prediction ("why Buy?") |
-| 📊 Backtesting | Simulated trading vs. Buy-and-Hold benchmark |
-| 🌐 Web Dashboard | Interactive Flask app with Chart.js visualizations |
+| 🟢 **Signal Classification** | A Buy/Sell/Hold classifier per sector — PyTorch LSTM for 7 sectors, XGBoost for Manufacturing & Processing |
+| 📊 **Out-of-Sample Backtesting** | Strategy simulation against a Buy-and-Hold benchmark on a chronological holdout, reporting return, Sharpe, max drawdown and win rate |
+| 📰 **News Sentiment** | FinBERT (HuggingFace Transformers) scores NEPSE headlines scraped from Sharesansar, aggregated into a daily market sentiment index |
+| 📈 **Market Dashboard** | Live ticker strip, market breadth, top gainers/losers, per-stock OHLCV detail pages and interactive Chart.js price history with crosshair hover |
+| 🎨 **Light / Dark / System Themes** | Full theming across every page and chart, persisted per visitor |
 
 ## 🛠 Tech Stack
 
-`Python` · `Flask` · `XGBoost` · `LightGBM` · `Prophet` · `TensorFlow/Keras` · `HuggingFace Transformers` · `SHAP` · `Optuna` · `BeautifulSoup` · `Chart.js` · `Bootstrap 5`
+**ML & Data** — `PyTorch` · `XGBoost` · `scikit-learn` · `HuggingFace Transformers (FinBERT)` · `pandas` · `NumPy`
 
-## 📁 Project Structure
+**Web** — `Flask` · `Gunicorn` · `Chart.js` · `Bootstrap 5`
+
+**Data Collection** — `BeautifulSoup` · `Selenium` · `nepse`
+
+**Infrastructure** — `Render` · `pytest`
+
+## 🏗 How It Works
 
 ```
-nepse_intelligence/
-├── config/                  # YAML configuration files
-├── src/
-│   ├── scraper/             # NEPSE & news web scrapers
-│   ├── features/            # Technical indicators & labeling
-│   ├── nlp/                 # Sentiment analysis pipeline
-│   ├── models/              # Forecaster & classifier
-│   └── backtesting/         # Strategy simulation
-├── app/                     # Flask web application
-│   ├── templates/           # HTML pages
-│   └── static/              # CSS, JS, Chart.js
-├── data/
-│   ├── raw/                 # Scraped CSV files
-│   ├── processed/           # Feature-engineered data
-│   └── models/              # Saved model files
-├── notebooks/               # EDA & modeling experiments
-└── examples/                # Standalone usage scripts
+Scrape ──▶ Feature Engineering ──▶ Sector Training ──▶ Backtest ──▶ Dashboard
+  │                │                      │                │            │
+NEPSE OHLCV    23 technical          LSTM × 7         Chronological  Flask +
++ Sharesansar  indicators +          XGBoost × 1      holdout vs.    Chart.js
+  headlines    forward-return        (per sector)     Buy & Hold
+               labels
 ```
 
-## 🚀 Getting Started
+**Why sector-wise models?** NEPSE sectors behave very differently — hydropower is dominated by project-completion news, while commercial banks track interest-rate cycles. A single market-wide model blurs those regimes, so each sector gets its own classifier trained only on its own tickers.
+
+**Evaluation methodology.** Models are trained on a rolling 2-year window and evaluated on a **chronological holdout** (the final 3 months, never seen during training) — not a random train/test split. LSTM sequences are built per-ticker to prevent cross-ticker leakage, and scalers are fit on training data only. This makes the reported numbers reflect genuine forward-looking performance rather than in-sample memorization.
+
+## 🚀 Quick Start
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/roshanpandey-1/nepse-intelligence.git
-cd nepse-intelligence
+# 1. Clone
+git clone https://github.com/roshanpandey-1/Nepal-Stock-Market-Predictor-Dashboard.git
+cd Nepal-Stock-Market-Predictor-Dashboard
 
-# 2. Create virtual environment
+# 2. Virtual environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate          # Windows: venv\Scripts\activate
 
 # 3. Install dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt   # full pipeline (training + scraping)
+# pip install -r requirements-web.txt   # dashboard only (lighter)
 
 # 4. Fetch stock data
 python examples/fetch_stock_data.py
 
-# 5. Run the web app
-python run.py
-# Open http://localhost:5000
+# 5. Run the dashboard
+python run.py                     # → http://localhost:5000
 ```
 
-## 📊 Model Performance
+**Run the dashboard without the full dataset:** the repo ships a trimmed snapshot used by the live deployment.
 
-Buy/Sell/Hold classifiers, one per NEPSE sector (LSTM for 7 sectors, XGBoost for
-Manufacturing And Processing). Trained on a rolling 2-year window ending
-Sept 2026, with a chronological holdout (last 3 months, never seen during
-training) used for the accuracy figures below — not a random split, so these
-numbers reflect real forward-looking performance rather than in-sample memorization.
+```bash
+DATA_DIR=deploy_data python run.py
+```
+
+### Other entry points
+
+| Command | Purpose |
+|---|---|
+| `python src/models/sector_trainer.py` | Train all sector models |
+| `python examples/run_backtests_oos.py` | Out-of-sample backtest across sectors |
+| `python examples/sentiment_demo.py` | Scrape + score news sentiment |
+| `python examples/build_deploy_snapshot.py` | Regenerate `deploy_data/` for deployment |
+| `pytest` | Run the test suite (23 tests) |
+
+## 📊 Results
+
+Buy/Sell/Hold classifiers, one per NEPSE sector, trained on a rolling 2-year window ending September 2026. All figures below are from the **chronological holdout** (last 3 months, unseen during training).
 
 | Sector | Model | Holdout Accuracy | Sell Recall | Buy Recall |
 |---|---|---|---|---|
@@ -84,32 +110,63 @@ numbers reflect real forward-looking performance rather than in-sample memorizat
 
 ### ⚠️ Known limitation: majority-class collapse
 
-The accuracy numbers above look reasonable at a glance, but most of that is the
-model defaulting to "Hold" for nearly every prediction — the Buy/Sell/Hold
-label distribution is Hold-dominated, and without class weighting the model
-learns that predicting Hold is the lowest-risk strategy. **6 of 8 sectors have
-near-zero Sell/Buy recall on the holdout set**, meaning they are not currently
-generating usable trading signals; only Manufacturing, and to a lesser extent
-Development Banks, meaningfully use all three classes.
+The accuracy column looks reasonable at a glance, but most of it comes from the model predicting **"Hold" for nearly every sample**. The label distribution is Hold-dominated, and without class weighting the model learns that always predicting Hold is the lowest-risk strategy.
 
-Two fixes were attempted and did not resolve this:
-- **Data noise removal** (dropping short-history tickers and unadjusted
-  bonus/rights-share price artifacts, with a NEPSE-rule-aware threshold — 10%
-  daily limit before Apr 20 2026, 15% after): improved data quality but moved
-  holdout accuracy by <1% in every sector.
-- **Percentile-based labeling** (Sell/Hold/Buy assigned by the 30th/70th
-  percentile of each ticker's forward return, instead of a fixed ±1%
-  threshold): fixed the collapse in 4 of 8 sectors but lowered overall accuracy
-  and left the other 4 still collapsed, so it was reverted.
+**6 of 8 sectors have near-zero Buy/Sell recall on the holdout set** — meaning they are not currently producing usable trading signals. Only Manufacturing & Processing, and to a lesser extent Development Banks, meaningfully use all three classes.
 
-The next thing worth trying is class-weighting in the training loss, which
-directly targets the imbalance rather than the labeling scheme — not yet
-implemented.
+Two remediations were attempted and neither resolved it:
+
+- **Data-noise removal** — dropping short-history tickers and unadjusted bonus/rights-share price artifacts, using a NEPSE-rule-aware threshold (10% daily circuit limit before 20 Apr 2026, 15% after). Improved data quality, but moved holdout accuracy by **<1% in every sector**.
+- **Percentile-based labeling** — assigning Sell/Hold/Buy by the 30th/70th percentile of each ticker's forward return instead of a fixed ±1% threshold. Fixed the collapse in 4 of 8 sectors but lowered overall accuracy and left the other 4 collapsed, so it was reverted.
+
+The next approach worth trying is **class weighting in the training loss**, which targets the imbalance directly rather than through the labeling scheme. Not yet implemented.
+
+## 📁 Project Structure
+
+```
+.
+├── app/                      # Flask dashboard
+│   ├── routes.py             # Page routes, market movers, caching
+│   ├── api.py                # JSON API — live model inference
+│   ├── templates/            # Jinja2 pages
+│   └── static/               # CSS, Chart.js logic
+├── src/
+│   ├── scraper/              # NEPSE price & news scrapers
+│   ├── features/             # Technical indicators & labeling
+│   ├── nlp/                  # FinBERT sentiment pipeline
+│   ├── models/               # Sector trainer (LSTM / XGBoost)
+│   └── backtesting/          # Strategy simulation & metrics
+├── data/                     # Full dataset (gitignored)
+│   ├── raw/  processed/  models/  news/
+├── deploy_data/              # Trimmed snapshot committed for deployment
+├── examples/                 # Runnable pipeline scripts
+├── tests/                    # 23 unit tests
+├── config/                   # YAML configuration
+├── render.yaml               # Render Blueprint (deployment)
+└── run.py                    # App entry point
+```
+
+## 🌐 Deployment
+
+The dashboard is deployed on **Render** via a Blueprint (`render.yaml`), which builds from `requirements-web.txt` and serves with Gunicorn.
+
+Because the full `data/` directory is gitignored, the app reads from `deploy_data/` in production — a trimmed snapshot (last ~260 rows per ticker plus the out-of-sample models) selected via the `DATA_DIR` environment variable. Regenerate it with `python examples/build_deploy_snapshot.py` after refreshing data or retraining.
+
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for full details.
+
+## 🗺 Roadmap
+
+- [ ] Class weighting in the training loss to address majority-class collapse
+- [ ] Automated daily data refresh (scheduled scrape → retrain → redeploy)
+- [ ] Per-ticker news sentiment (currently market-wide only)
+- [ ] Validated price forecasting — Prophet/LSTM forecasting code exists in `src/models/` but has not been validated, so it is **not** wired into the dashboard
 
 ## ⚠️ Disclaimer
 
-This tool is for **educational purposes only** and does not constitute financial advice. Past model performance does not guarantee future returns. Always consult a licensed financial advisor before making investment decisions.
+This project is for **educational and research purposes only** and does not constitute financial advice. As documented above, the current models do not produce reliable trading signals. Past performance does not guarantee future returns. Always consult a licensed financial advisor before making investment decisions.
 
 ## 👤 Author
 
-**Roshan Pandey** · [roshanpandey-1.github.io](https://roshanpandey-1.github.io) · [GitHub](https://github.com/roshanpandey-1)
+**Roshan Pandey**
+
+[Portfolio](https://roshanpandey-1.github.io) · [GitHub](https://github.com/roshanpandey-1)
