@@ -35,3 +35,7 @@ data/models/
 
 # Logs
 *.log
+# Exception: trimmed deployment data snapshot (see deploy_data/README.md),
+# committed on purpose so the live dashboard has data to serve.
+!deploy_data/
+!deploy_data/**

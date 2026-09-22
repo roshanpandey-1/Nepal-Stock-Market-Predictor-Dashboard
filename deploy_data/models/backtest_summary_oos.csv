@@ -1,0 +1,9 @@
+sector,model_type,ticker,holdout_start,holdout_days,ml_return_pct,bnh_return_pct,sharpe_ratio,max_drawdown_pct,win_rate_pct,num_trades,final_value
+Manufacturing And Processing,XGBoost,HDL,2026-06-22,62,1.92,6.39,1.782,-1.14,0.0,0,101915.07
+Hydro Power,LSTM,CHCL,2026-06-22,62,0.0,-23.93,0.0,0.0,0.0,0,100000.0
+Microfinance,LSTM,CBBL,2026-06-22,62,0.0,4.8,0.0,0.0,0.0,0,100000.0
+Commercial Banks,LSTM,CZBIL,2026-06-22,62,0.0,6.98,0.0,0.0,0.0,0,100000.0
+Development Banks,LSTM,MNBBL,2026-06-22,62,0.0,-9.19,0.0,0.0,0.0,0,100000.0
+Finance,LSTM,ICFC,2026-06-22,62,0.0,-2.49,0.0,0.0,0.0,0,100000.0
+Life Insurance,LSTM,ALICL,2026-06-22,62,0.0,-2.72,0.0,0.0,0.0,0,100000.0
+Non Life Insurance,LSTM,NLG,2026-06-22,62,0.0,-14.5,0.0,0.0,0.0,0,100000.0

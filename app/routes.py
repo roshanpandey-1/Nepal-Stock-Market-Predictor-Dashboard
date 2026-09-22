@@ -4,7 +4,8 @@ from flask import Blueprint, render_template, abort
 
 main = Blueprint("main", __name__)
 
-DATA_DIR = Path("data")
+import os
+DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 MODELS_DIR = DATA_DIR / "models"
 PROCESSED_DIR = DATA_DIR / "processed"
 NEWS_DIR = DATA_DIR / "news"
