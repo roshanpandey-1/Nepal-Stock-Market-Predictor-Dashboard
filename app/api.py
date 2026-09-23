@@ -269,3 +269,16 @@ def live_quote(ticker):
             "ticker": ticker,
             "reason": f"{type(exc).__name__}",
         })
+
+
+@api.route("/tickers")
+def tickers():
+    """Ticker + company name list, for the navbar search autocomplete.
+
+    Fetched once per page rather than inlined into every page's HTML.
+    """
+    try:
+        from app.routes import search_options
+        return jsonify(search_options())
+    except Exception:
+        return jsonify([])

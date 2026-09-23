@@ -10,6 +10,7 @@
   --red: #dc2626;
   --amber: #d97706;
   --accent: #1d6fd6;
+  --heading: #0b2e4f;
   --row-hover: #f8fafc;
   --neutral-bg: #f1f5f9;
   --input-bg: #ffffff;
@@ -27,8 +28,8 @@
 :root[data-theme="dark"] {
   --navy: #13304d;
   --navy-dark: #0a1c2e;
-  --bg: #0f1620;
-  --card-bg: #182231;
+  --bg: #080c12;
+  --card-bg: #131c29;
   --border: #2b3a4d;
   --text: #e6ebf1;
   --text-dim: #90a0b3;
@@ -36,6 +37,7 @@
   --red: #f87171;
   --amber: #fbbf24;
   --accent: #5b9bf0;
+  --heading: #f1f5f9;
   --row-hover: #1f2a3a;
   --neutral-bg: #1f2a3a;
   --input-bg: #182231;
@@ -51,8 +53,8 @@
   :root[data-theme="system"] {
     --navy: #13304d;
     --navy-dark: #0a1c2e;
-    --bg: #0f1620;
-    --card-bg: #182231;
+    --bg: #080c12;
+    --card-bg: #131c29;
     --border: #2b3a4d;
     --text: #e6ebf1;
     --text-dim: #90a0b3;
@@ -60,6 +62,7 @@
     --red: #f87171;
     --amber: #fbbf24;
     --accent: #5b9bf0;
+    --heading: #f1f5f9;
     --row-hover: #1f2a3a;
     --neutral-bg: #1f2a3a;
     --input-bg: #182231;
@@ -108,6 +111,19 @@ body {
   align-items: baseline;
 }
 .ticker-item .sym { color: #fff; font-weight: 600; }
+/* Strip items are links. The marquee pauses on hover (rule above), which is
+   what makes a moving target clickable. */
+a.ticker-item {
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.12s ease;
+}
+a.ticker-item:hover {
+  background: rgba(255,255,255,0.12);
+  text-decoration: none;
+}
+a.ticker-item:hover .sym { text-decoration: underline; }
 .ticker-item .chg.pos { color: #4ade80; }
 .ticker-item .chg.neg { color: #f87171; }
 
@@ -116,36 +132,69 @@ body {
   background: var(--navy) !important;
   border-bottom: 1px solid var(--navy-dark);
   padding: 10px 0;
+  min-height: 0;
+}
+/* The navbar reuses .container-main for width/centering, but that class also
+   carries the page body's 20px/60px vertical padding -- which showed up as a
+   tall empty band inside the header. Width only, no vertical padding here. */
+.navbar .container-main {
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .navbar-brand {
   font-weight: 700;
   color: #fff !important;
   letter-spacing: 0.01em;
+  font-size: 1.18rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-right: 0;
 }
-.nav-link { color: #b9c6d6 !important; font-size: 0.92rem; }
+.nav-link {
+  color: #b9c6d6 !important;
+  font-size: 0.98rem;
+  padding: 4px 2px 6px;
+  position: relative;
+  transition: color 0.12s ease;
+}
 .nav-link.active, .nav-link:hover { color: #fff !important; }
+.nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: #5b9bf0;
+  border-radius: 2px;
+}
 
 .container-main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
 
 .card-panel {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 18px 20px;
   margin-bottom: 18px;
   box-shadow: 0 1px 2px var(--shadow);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.card-panel:hover {
+  box-shadow: 0 4px 14px var(--shadow);
 }
 .card-panel h3 {
-  font-size: 1rem;
+  font-size: 0.92rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
+  font-weight: 700;
   color: var(--text-dim);
   margin-bottom: 14px;
-  border-bottom: 1px solid var(--border);
   padding-bottom: 10px;
+  padding-left: 10px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
 }
 
-h1, h2 { color: var(--navy); }
+h1, h2 { color: var(--heading); }
 .text-dim { color: var(--text-dim); }
 
 table.data-table {
@@ -189,7 +238,7 @@ table.data-table tbody tr:hover { background: var(--row-hover); }
   padding: 14px 16px;
 }
 .stat-tile .label { color: var(--text-dim); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
-.stat-tile .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; color: var(--navy); }
+.stat-tile .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; color: var(--heading); }
 .stat-tile.sm { padding: 10px 14px; }
 .stat-tile.sm .value { font-size: 1.15rem; margin-top: 2px; }
 
@@ -204,7 +253,7 @@ table.data-table tbody tr:hover { background: var(--row-hover); }
 .quote-header h1 { margin-bottom: 2px; }
 .quote-header .company-name { color: var(--text-dim); font-size: 1.05rem; }
 .quote-price { text-align: right; }
-.quote-price .ltp { font-size: 2rem; font-weight: 700; color: var(--navy); line-height: 1.1; }
+.quote-price .ltp { font-size: 2rem; font-weight: 700; color: var(--heading); line-height: 1.1; }
 .quote-price .chg { font-size: 1rem; font-weight: 600; margin-top: 2px; }
 @media (max-width: 640px) {
   .quote-header { align-items: flex-start; }
@@ -236,6 +285,25 @@ a:hover { text-decoration: underline; }
 }
 
 /* --- Breadth pills (Advancing / Declining / Unchanged) --- */
+.indices-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.index-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  background: var(--neutral-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+}
+.index-chip .name { color: var(--text-dim); font-weight: 600; }
+.index-chip .value { font-weight: 700; color: var(--heading); }
+
 .breadth-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .breadth-pill {
   flex: 1;
@@ -253,6 +321,7 @@ a:hover { text-decoration: underline; }
 .breadth-pill.dec .n { color: var(--red); }
 .breadth-pill.unc { background: var(--neutral-bg); }
 .breadth-pill.unc .n { color: var(--text-dim); }
+.breadth-pill { border: 1px solid var(--border); }
 
 /* --- News list (ShareHub "Recent News" style) --- */
 .news-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -273,9 +342,9 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .period-toggle button.active {
-  background: var(--navy);
+  background: var(--accent);
   color: #fff;
-  border-color: var(--navy);
+  border-color: var(--accent);
 }
 
 /* --- Theme toggle (Light / Dark / System) --- */
@@ -291,8 +360,8 @@ a:hover { text-decoration: underline; }
   border: none;
   background: transparent;
   color: #b9c6d6;
-  width: 28px;
-  height: 26px;
+  width: 26px;
+  height: 22px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -306,3 +375,140 @@ a:hover { text-decoration: underline; }
   color: #fff;
 }
 .theme-toggle button:hover { color: #fff; }
+
+/* --- Live market panel ("Market Now") --- */
+.live-badge {
+  float: right;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  background: var(--neutral-bg);
+}
+.live-badge.on {
+  color: var(--green);
+  border-color: rgba(22,163,74,0.4);
+  background: rgba(22,163,74,0.10);
+}
+.live-badge.stale {
+  color: var(--amber);
+  border-color: rgba(217,119,6,0.4);
+  background: rgba(217,119,6,0.10);
+}
+.live-badge.off {
+  color: var(--text-dim);
+}
+
+.live-index {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+}
+.live-index-name { color: var(--text-dim); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.live-index-value { font-size: 1.6rem; font-weight: 700; color: var(--heading); }
+
+/* Source badge on sections that upgrade from end-of-day to live data */
+.src-badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--neutral-bg);
+  color: var(--text-dim);
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.src-badge.live {
+  color: var(--green);
+  border-color: rgba(22,163,74,0.4);
+  background: rgba(22,163,74,0.10);
+}
+.src-badge.stale {
+  color: var(--amber);
+  border-color: rgba(217,119,6,0.4);
+  background: rgba(217,119,6,0.10);
+}
+
+/* Marks a sector index that this project trains a model for */
+.model-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 7px;
+  vertical-align: middle;
+}
+
+/* --- Navbar ticker search --- */
+.nav-search { position: relative; margin-left: 22px; }
+.nav-search input {
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 0.82rem;
+  width: 260px;
+  outline: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.nav-search input::placeholder { color: #93a6bd; }
+.nav-search input:focus {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.35);
+}
+
+.nav-search-results {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 340px;
+  max-height: 340px;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16,24,40,0.18);
+  z-index: 1050;
+}
+.nav-search-results.open { display: block; }
+.nav-search-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+}
+.nav-search-item:last-child { border-bottom: none; }
+.nav-search-item:hover,
+.nav-search-item.active { background: var(--row-hover); }
+.nav-search-item .sym {
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 0.82rem;
+  flex: 0 0 auto;
+}
+.nav-search-item .nm {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 991px) {
+  /* keep the header single-line on small screens */
+  .nav-search { display: none; }
+}

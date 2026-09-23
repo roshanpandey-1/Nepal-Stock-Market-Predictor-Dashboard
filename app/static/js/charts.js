@@ -756,3 +756,132 @@ function renderSubIndices(rows) {
     }).join("")}</tbody>
   </table>`;
 }
+
+// --- Navbar ticker search ---------------------------------------------------
+// A custom autocomplete rather than a native <datalist>: browsers dump every
+// option on focus, which meant all 260 tickers appeared before typing a
+// character. This only renders after input and caps the list.
+
+const NAV_SEARCH_LIMIT = 8;
+let _tickerIndex = null;      // [{t, n}], fetched once
+let _tickerIndexPromise = null;
+let _navSearchActive = -1;    // highlighted row for keyboard nav
+
+async function _loadTickerIndex() {
+  if (_tickerIndex) return _tickerIndex;
+  if (!_tickerIndexPromise) {
+    _tickerIndexPromise = fetch("/api/tickers")
+      .then(r => r.json())
+      .then(rows => { _tickerIndex = Array.isArray(rows) ? rows : []; return _tickerIndex; })
+      .catch(() => { _tickerIndex = []; return _tickerIndex; });
+  }
+  return _tickerIndexPromise;
+}
+
+function _matchTickers(query) {
+  const q = (query || "").trim().toLowerCase();
+  if (!q || !_tickerIndex) return [];
+  const starts = [], contains = [];
+  for (const row of _tickerIndex) {
+    const t = row.t.toLowerCase();
+    const n = (row.n || "").toLowerCase();
+    if (t.startsWith(q) || n.startsWith(q)) starts.push(row);
+    else if (t.includes(q) || n.includes(q)) contains.push(row);
+    if (starts.length >= NAV_SEARCH_LIMIT) break;
+  }
+  return starts.concat(contains).slice(0, NAV_SEARCH_LIMIT);
+}
+
+function _escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, ch => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
+  ));
+}
+
+function _renderNavResults(rows) {
+  const box = document.getElementById("nav-search-results");
+  const input = document.getElementById("nav-search-input");
+  if (!box) return;
+
+  if (!rows.length) {
+    box.innerHTML = "";
+    box.classList.remove("open");
+    if (input) input.setAttribute("aria-expanded", "false");
+    return;
+  }
+  box.innerHTML = rows.map((r, i) => `
+    <div class="nav-search-item${i === _navSearchActive ? " active" : ""}"
+         role="option" data-ticker="${_escapeHTML(r.t)}" data-index="${i}">
+      <span class="sym">${_escapeHTML(r.t)}</span>
+      <span class="nm">${_escapeHTML(r.n || "")}</span>
+    </div>`).join("");
+  box.classList.add("open");
+  if (input) input.setAttribute("aria-expanded", "true");
+}
+
+function _closeNavResults() {
+  const box = document.getElementById("nav-search-results");
+  const input = document.getElementById("nav-search-input");
+  _navSearchActive = -1;
+  if (box) { box.innerHTML = ""; box.classList.remove("open"); }
+  if (input) input.setAttribute("aria-expanded", "false");
+}
+
+function _gotoTicker(ticker) {
+  if (ticker) window.location = `/stock/${encodeURIComponent(ticker)}`;
+}
+
+function wireNavSearch() {
+  const form = document.getElementById("nav-search-form");
+  const input = document.getElementById("nav-search-input");
+  const box = document.getElementById("nav-search-results");
+  if (!form || !input || !box) return;
+
+  // warm the index on focus so the first keystroke already has data
+  input.addEventListener("focus", _loadTickerIndex);
+
+  input.addEventListener("input", async () => {
+    await _loadTickerIndex();
+    _navSearchActive = -1;
+    _renderNavResults(_matchTickers(input.value));
+  });
+
+  input.addEventListener("keydown", (e) => {
+    const rows = box.querySelectorAll(".nav-search-item");
+    if (e.key === "ArrowDown" && rows.length) {
+      e.preventDefault();
+      _navSearchActive = Math.min(_navSearchActive + 1, rows.length - 1);
+      _renderNavResults(_matchTickers(input.value));
+    } else if (e.key === "ArrowUp" && rows.length) {
+      e.preventDefault();
+      _navSearchActive = Math.max(_navSearchActive - 1, 0);
+      _renderNavResults(_matchTickers(input.value));
+    } else if (e.key === "Escape") {
+      _closeNavResults();
+    }
+  });
+
+  box.addEventListener("mousedown", (e) => {
+    // mousedown, not click -- blur would close the list first
+    const item = e.target.closest(".nav-search-item");
+    if (item) { e.preventDefault(); _gotoTicker(item.dataset.ticker); }
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const matches = _matchTickers(input.value);
+    if (_navSearchActive >= 0 && matches[_navSearchActive]) {
+      _gotoTicker(matches[_navSearchActive].t);
+    } else if (matches.length) {
+      _gotoTicker(matches[0].t);          // best match on plain Enter
+    } else if (input.value.trim()) {
+      _gotoTicker(input.value.trim().toUpperCase());
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!form.contains(e.target)) _closeNavResults();
+  });
+}
+
+wireNavSearch();

@@ -137,6 +137,26 @@ def _get_cached_movers(limit=5):
     )
 
 
+_SEARCH_OPTIONS = None
+
+
+def search_options():
+    """Ticker list for the navbar search: [{"t": symbol, "n": company name}].
+
+    Built once per process from two static files and served via /api/tickers,
+    so the 260-entry list is fetched once by the browser instead of being
+    inlined into every page's HTML.
+    """
+    global _SEARCH_OPTIONS
+    if _SEARCH_OPTIONS is None:
+        names = _company_names()
+        _SEARCH_OPTIONS = [
+            {"t": ticker, "n": names.get(ticker) or ""}
+            for ticker in sorted(_ticker_list())
+        ]
+    return _SEARCH_OPTIONS
+
+
 @main.app_context_processor
 def inject_ticker_strip():
     """Site-wide scrolling ticker strip (like ShareHub's top bar) available
