@@ -49,22 +49,56 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
       </div>
     </div>
 
-    <div class="card-panel mt-3">
-      <h3>Market Breadth (Latest Session)</h3>
-      <div class="breadth-row">
-        <div class="breadth-pill adv"><span class="n">{{ market_breadth.advancing }}</span>Advancing</div>
-        <div class="breadth-pill dec"><span class="n">{{ market_breadth.declining }}</span>Declining</div>
-        <div class="breadth-pill unc"><span class="n">{{ market_breadth.unchanged }}</span>Unchanged</div>
+    <div class="card-panel mt-3" id="live-panel">
+      <h3>
+        Market Now
+        <span class="live-badge" id="live-status">checking…</span>
+      </h3>
+
+      <div id="indices-strip" class="indices-strip"></div>
+
+      <div id="live-body" class="text-dim" style="font-size:0.88rem;">
+        Loading live market data…
+      </div>
+
+      <div id="live-chart-wrap" style="display:none;">
+        <canvas id="live-index-chart" height="110"></canvas>
+      </div>
+
+      <p class="text-dim mt-2" style="font-size:0.74rem; margin-bottom:0;">
+        Live intraday data direct from NEPSE, refreshed about once a minute.
+        Breadth counts every scrip currently trading. Live prices are shown for
+        reference only — the Buy/Sell/Hold signals below are computed from
+        completed daily candles and deliberately ignore intraday prices.
+      </p>
+    </div>
+
+    <div class="row g-3 mt-1 mb-3">
+      <div class="col-md-7">
+        <div class="card-panel h-100" id="subindex-panel" style="display:none; margin-bottom:0;">
+          <h3>Sector Indices</h3>
+          <div id="subindex-body"></div>
+          <p class="text-dim mt-2" style="font-size:0.74rem; margin-bottom:0;">
+            NEPSE's sector sub-indices, live. Sectors marked with a dot are the ones
+            this project trains a Buy/Sell/Hold model for.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-5">
+        <div class="card-panel h-100" id="turnover-panel" style="display:none; margin-bottom:0;">
+          <h3>Top Turnover</h3>
+          <div id="turnover-body"></div>
+        </div>
       </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3 mb-3">
       <div class="col-md-6">
-        <div class="card-panel" style="margin-bottom:0;">
-          <h3>Top Gainers</h3>
+        <div class="card-panel h-100" style="margin-bottom:0;">
+          <h3>Top Gainers <span class="src-badge" id="movers-source">last session</span></h3>
           <table class="data-table">
             <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th></tr></thead>
-            <tbody>
+            <tbody id="gainers-body">
               {% for m in top_gainers %}
               <tr>
                 <td><a href="{{ url_for('main.stock_detail', ticker=m.ticker) }}">{{ m.ticker }}</a></td>
@@ -79,11 +113,11 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
         </div>
       </div>
       <div class="col-md-6">
-        <div class="card-panel" style="margin-bottom:0;">
+        <div class="card-panel h-100" style="margin-bottom:0;">
           <h3>Top Losers</h3>
           <table class="data-table">
             <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th></tr></thead>
-            <tbody>
+            <tbody id="losers-body">
               {% for m in top_losers %}
               <tr>
                 <td><a href="{{ url_for('main.stock_detail', ticker=m.ticker) }}">{{ m.ticker }}</a></td>
@@ -97,21 +131,6 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
           </table>
         </div>
       </div>
-    </div>
-
-    <div class="card-panel">
-      <h3>Look up a ticker</h3>
-      <form action="#" onsubmit="event.preventDefault(); const t = document.getElementById('ticker-select').value; if (t) window.location = '/stock/' + t;">
-        <div class="d-flex gap-2">
-          <select id="ticker-select" class="form-select" style="max-width:280px;">
-            <option value="">Select a ticker…</option>
-            {% for t in tickers %}
-            <option value="{{ t }}">{{ t }}</option>
-            {% endfor %}
-          </select>
-          <button class="btn btn-primary" type="submit">View</button>
-        </div>
-      </form>
     </div>
 
     <div class="card-panel">
@@ -158,4 +177,9 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
   </div>
 </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+  initLiveMarket();
+</script>
 {% endblock %}

@@ -212,3 +212,60 @@ def market_overview():
         "sectors": [s["sector"] for s in sectors],
         "latest_market_sentiment": latest_sentiment,
     })
+
+
+@api.route("/live")
+def live_market():
+    """Live NEPSE market snapshot (index, market status, top movers).
+
+    Served from a short TTL cache in src/scraper/live_market.py -- NEPSE is
+    never called per page load. Always returns HTTP 200 with an `available`
+    flag rather than an error status, so the dashboard can degrade quietly
+    when NEPSE is unreachable (a real possibility from hosts outside Nepal).
+
+    Note: these are intraday values for display only. They are deliberately
+    NOT fed into the Buy/Sell/Hold models, which were trained on completed
+    daily candles -- see README "Known limitation".
+    """
+    try:
+        from src.scraper.live_market import get_live_snapshot
+        snapshot = dict(get_live_snapshot())
+        # per-ticker lookup is server-side only; all ~333 rows would bloat
+        # every 60s poll for data the dashboard doesn't display
+        snapshot.pop("_quotes", None)
+        return jsonify(snapshot)
+    except Exception as exc:  # import error, unexpected bug -- never 500 the page
+        return jsonify({
+            "available": False,
+            "reason": f"Live data unavailable ({type(exc).__name__})",
+            "market_open": None,
+            "index": None,
+            "gainers": [],
+            "losers": [],
+            "stale": False,
+        })
+
+
+@api.route("/live/quote/<ticker>")
+def live_quote(ticker):
+    """Live quote for a single ticker.
+
+    Served from the same cached getLiveMarket payload the dashboard uses, so
+    this costs no extra NEPSE calls. Returns available=false (not an error)
+    when live data is unavailable or the ticker isn't trading today, letting
+    the stock page fall back to its end-of-day figures.
+    """
+    ticker = (ticker or "").strip().upper()
+    try:
+        from src.scraper.live_market import get_live_quote
+        quote = get_live_quote(ticker)
+        if not quote:
+            return jsonify({"available": False, "ticker": ticker})
+        quote["available"] = True
+        return jsonify(quote)
+    except Exception as exc:
+        return jsonify({
+            "available": False,
+            "ticker": ticker,
+            "reason": f"{type(exc).__name__}",
+        })

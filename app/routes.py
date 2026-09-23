@@ -161,12 +161,7 @@ def dashboard():
     latest_sentiment = sentiment_rows[-1] if sentiment_rows else None
     headlines = _read_csv(NEWS_DIR / "news_sentiment.csv")
     recent_headlines = list(reversed(headlines))[:6]
-    gainers, losers, all_movers = _get_cached_movers(limit=5)
-    market_breadth = {
-        "advancing": sum(1 for m in all_movers if m["change_pct"] > 0),
-        "declining": sum(1 for m in all_movers if m["change_pct"] < 0),
-        "unchanged": sum(1 for m in all_movers if m["change_pct"] == 0),
-    }
+    gainers, losers, _ = _get_cached_movers(limit=5)
     return render_template(
         "dashboard.html",
         backtest_rows=backtest_rows,
@@ -177,7 +172,6 @@ def dashboard():
         recent_headlines=recent_headlines,
         top_gainers=gainers,
         top_losers=losers,
-        market_breadth=market_breadth,
     )
 
 
@@ -221,16 +215,44 @@ def _latest_quote(ticker):
     return quote
 
 
+def _live_quote_safe(ticker):
+    """Live quote for a ticker, or None. Never raises, never blocks long --
+    reads the same cached snapshot the dashboard uses."""
+    try:
+        from src.scraper.live_market import get_live_quote
+        return get_live_quote(ticker)
+    except Exception:
+        return None
+
+
 @main.route("/stock/<ticker>")
 def stock_detail(ticker):
     ticker = ticker.upper()
     sector = _ticker_sector(ticker)
+    live = _live_quote_safe(ticker)
+
+    # NEPSE trades ~333 instruments, but our processed dataset covers only the
+    # 260 equities the models were trained on. Mutual funds, debentures and
+    # newly listed scrips show up in the live feed (and therefore in the live
+    # movers tables) with no history behind them -- serve those as a live-only
+    # page instead of a 404.
     if sector is None:
-        abort(404, description=f"No processed data for ticker '{ticker}'")
+        if not live:
+            abort(404, description=f"No data for ticker '{ticker}'")
+        return render_template(
+            "stock_detail.html",
+            ticker=ticker,
+            sector=None,
+            company_name=live.get("name") or ticker,
+            quote=None,
+            has_history=False,
+        )
+
     return render_template(
         "stock_detail.html", ticker=ticker, sector=sector,
         company_name=_company_name(ticker),
         quote=_latest_quote(ticker),
+        has_history=True,
     )
 
 

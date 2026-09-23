@@ -3,7 +3,9 @@
 # includes heavy packages (Prophet, Transformers, SHAP, Optuna, LightGBM,
 # Selenium) this web process never imports -- installing all of that on a
 # free-tier host risks hitting build time/RAM/disk limits for no reason.
-flask==3.0.0
+# Pinned to 3.1.0 because NepseUnofficialApi (live NEPSE data) requires
+# flask==3.1.0 exactly; leaving this at 3.0.0 makes pip fail to resolve.
+flask==3.1.0
 flask-cors==4.0.0
 gunicorn==21.2.0
 numpy==1.26.2
@@ -14,3 +16,8 @@ torch==2.1.1
 # (CUDA-enabled) build, switch to the smaller CPU-only wheel instead:
 #   --extra-index-url https://download.pytorch.org/whl/cpu
 #   torch==2.1.1+cpu
+
+# Live NEPSE market data for /api/live. If a host can't install from git, or
+# NEPSE blocks it, the dashboard degrades to end-of-day data automatically --
+# see src/scraper/live_market.py.
+nepse @ git+https://github.com/basic-bgnr/NepseUnofficialApi

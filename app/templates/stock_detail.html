@@ -4,49 +4,62 @@
 
 <div class="quote-header">
   <div class="quote-id">
-    <h1>{{ ticker }}</h1>
+    <h1>{{ ticker }} <span class="src-badge" id="q-source">last session</span></h1>
     <div class="company-name">{{ company_name }}</div>
+    {% if sector %}
     <div class="text-dim" style="font-size:0.85rem;">Sector: {{ sector }}</div>
+    {% else %}
+    <div class="text-dim" style="font-size:0.85rem;">Live market data only</div>
+    {% endif %}
   </div>
-  {% if quote %}
   <div class="quote-price">
-    <div class="ltp">Rs. {{ quote.close }}</div>
-    {% if quote.change is not none %}
-    <div class="chg {{ 'pos' if quote.change >= 0 else 'neg' }}">
+    <div class="ltp" id="q-ltp">{{ ('Rs. ' + quote.close|string) if quote else '—' }}</div>
+    <div class="chg {{ 'pos' if quote and quote.change is not none and quote.change >= 0 else 'neg' }}" id="q-change">
+      {% if quote and quote.change is not none %}
       {{ '+' if quote.change >= 0 else '' }}{{ quote.change }}
       ({{ '+' if quote.change_pct >= 0 else '' }}{{ quote.change_pct }}%)
+      {% endif %}
     </div>
-    {% endif %}
-    <div class="text-dim" style="font-size:0.78rem;">As of {{ quote.date }} (most recent processed trading day)</div>
+    <div class="text-dim" style="font-size:0.78rem;" id="q-asof">
+      {% if quote %}As of {{ quote.date }} (most recent processed trading day)
+      {% else %}Loading live data…{% endif %}
+    </div>
   </div>
-  {% endif %}
 </div>
 
-{% if quote %}
 <div class="row g-2 mb-3">
   <div class="col-6 col-md-3">
-    <div class="stat-tile sm"><div class="label">Open</div><div class="value">Rs. {{ quote.open }}</div></div>
+    <div class="stat-tile sm"><div class="label">Open</div><div class="value" id="q-open">{{ ('Rs. ' + quote.open|string) if quote else '—' }}</div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-tile sm"><div class="label">High</div><div class="value">Rs. {{ quote.high }}</div></div>
+    <div class="stat-tile sm"><div class="label">High</div><div class="value" id="q-high">{{ ('Rs. ' + quote.high|string) if quote else '—' }}</div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-tile sm"><div class="label">Low</div><div class="value">Rs. {{ quote.low }}</div></div>
+    <div class="stat-tile sm"><div class="label">Low</div><div class="value" id="q-low">{{ ('Rs. ' + quote.low|string) if quote else '—' }}</div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-tile sm"><div class="label">Prev. Close</div><div class="value">{{ ('Rs. ' + quote.prev_close|string) if quote.prev_close is not none else '—' }}</div></div>
+    <div class="stat-tile sm"><div class="label">Prev. Close</div><div class="value" id="q-prev">{{ ('Rs. ' + quote.prev_close|string) if quote and quote.prev_close is not none else '—' }}</div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-tile sm"><div class="label">Volume</div><div class="value">{{ '{:,}'.format(quote.volume) }}</div></div>
+    <div class="stat-tile sm"><div class="label">Volume</div><div class="value" id="q-volume">{{ '{:,}'.format(quote.volume) if quote else '—' }}</div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-tile sm"><div class="label">Turnover</div><div class="value">{{ '{:,.0f}'.format(quote.turnover) }}</div></div>
+    <div class="stat-tile sm"><div class="label">Turnover</div><div class="value" id="q-turnover">{{ '{:,.0f}'.format(quote.turnover) if quote else '—' }}</div></div>
+  </div>
+  <div class="col-6 col-md-3" id="q-avg-wrap" style="display:none;">
+    <div class="stat-tile sm"><div class="label">Avg. Price</div><div class="value" id="q-avg">—</div></div>
   </div>
 </div>
-{% else %}
-<div class="limitation-note">No recent OHLCV row was found for this ticker to build a quote snapshot from.</div>
+
+{% if not has_history %}
+<div class="limitation-note">
+  <strong>{{ ticker }}</strong> trades on NEPSE but isn't in our historical dataset — it's a mutual fund,
+  debenture or recently listed scrip, and the models were trained on the 260 equities with a long enough
+  price history. Live prices above are real; there's no price chart or Buy/Sell/Hold signal for it.
+</div>
 {% endif %}
 
+{% if has_history %}
 <div class="row g-3 mb-3">
   <div class="col-12 col-md-4">
     <div class="stat-tile">
@@ -79,10 +92,12 @@
     Our data is end-of-day only (one close per trading day), so 1D/1W show the last few daily closes rather than intraday movement.
   </p>
 </div>
+{% endif %}
 
 {% endblock %}
 {% block scripts %}
 <script>
-  loadStockDetail("{{ ticker }}");
+  {% if has_history %}loadStockDetail("{{ ticker }}");{% endif %}
+  initLiveQuote("{{ ticker }}");
 </script>
 {% endblock %}
