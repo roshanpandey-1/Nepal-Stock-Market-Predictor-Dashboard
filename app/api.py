@@ -27,7 +27,13 @@ DROP_COLS = {"Date", "Open", "High", "Low", "Close", "Volume", "Trades",
              "Turnover", "Ticker", "Label", "Future_Return", "Sector"}
 LSTM_SECTORS = {"Hydro Power", "Microfinance", "Commercial Banks",
                 "Development Banks", "Finance", "Life Insurance",
-                "Non Life Insurance"}
+                "Non Life Insurance",
+                # Added for learning/coverage purposes -- these 4 collapse to
+                # "Hold" even more heavily than the original 8 (0 trades on
+                # the chronological OOS holdout for the representative
+                # ticker in each). Kept in for completeness, not because
+                # the signal is trustworthy -- see README Known Limitations.
+                "Hotels And Tourism", "Investment", "Others", "Tradings"}
 LABELS = {0: "Sell", 1: "Hold", 2: "Buy"}
 
 

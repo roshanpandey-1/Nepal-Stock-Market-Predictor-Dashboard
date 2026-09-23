@@ -40,7 +40,8 @@ if HAS_TORCH:
 
 
 LSTM_SECTORS = ['Hydro Power', 'Microfinance', 'Commercial Banks', 'Development Banks',
-                'Finance', 'Life Insurance', 'Non Life Insurance']
+                'Finance', 'Life Insurance', 'Non Life Insurance',
+                'Hotels And Tourism', 'Investment', 'Others', 'Tradings']
 XGB_SECTORS = ['Manufacturing And Processing']
 
 drop_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume',
