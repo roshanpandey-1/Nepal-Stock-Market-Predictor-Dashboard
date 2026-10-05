@@ -2,7 +2,7 @@
 NEPSE News Sentiment Analyzer
 Scrapes latest news from Sharesansar and scores sentiment using FinBERT.
 Produces a daily market-wide sentiment score (per-stock matching was tried
-and found unreliable — see notebooks/03_sentiment_analysis.ipynb for why).
+and found unreliable — see notebooks/sentiment_analysis.ipynb for why).
 
 Run: python src/nlp/sentiment_analyzer.py
 """

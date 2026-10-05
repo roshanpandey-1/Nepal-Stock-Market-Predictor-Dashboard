@@ -967,7 +967,7 @@ function wireNavSearch() {
 wireNavSearch();
 
 // ── Price Forecast chart (stock detail page) ────────────────────────────
-// Mirrors notebooks/04_forecasting_models.ipynb: actual price history (last
+// Mirrors notebooks/forecasting_models.ipynb: actual price history (last
 // ~180 days) + the forecast's dashed line + a shaded confidence band, with
 // Plotly's built-in range slider and 1W/1M/3M/6M/All zoom buttons. Fetches
 // its own two endpoints once and keeps its own Plotly figure -- deliberately
