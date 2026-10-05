@@ -18,12 +18,10 @@ import time
 from pathlib import Path
 import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from src.features.technical_indicators import TechnicalIndicators
 from src.features.labeler import add_labels
@@ -36,14 +34,16 @@ DONE_LOG = PROCESSED_DIR / "incremental_done.txt"
 
 def get_driver():
     options = Options()
-    options.add_argument('--headless')
+    options.add_argument('--headless=new')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
-    return webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
+    # Selenium 4.6+ ships its own driver manager (Selenium Manager) that
+    # detects the installed Chrome version and fetches a matching
+    # chromedriver automatically -- no need for webdriver_manager, whose
+    # cache has been a source of "not a valid Win32 application" errors
+    # on Windows when it grabs a mismatched/corrupted binary.
+    return webdriver.Chrome(options=options)
 
 
 def scrape_new_rows(driver, ticker: str, last_known_date: pd.Timestamp) -> pd.DataFrame:
@@ -189,3 +189,14 @@ if __name__ == '__main__':
     logger.info(f"DONE! Updated: {len(updated)} | Unchanged: {len(unchanged)} | Failed: {len(failed)}")
     if failed:
         logger.info(f"Failed tickers: {failed}")
+
+    # A full run (no --ticker-limit style early exit) reached the end of the
+    # ticker list -- clear the resume log so the NEXT invocation (e.g.
+    # tomorrow's update) starts fresh instead of finding this run's entries
+    # and silently skipping every ticker as "already done".
+    if len(done) + len(updated) + len(unchanged) + len(failed) >= len(tickers):
+        try:
+            DONE_LOG.unlink()
+            logger.info("Resume log cleared -- next run will start fresh.")
+        except FileNotFoundError:
+            pass
