@@ -69,6 +69,66 @@ def forecast(ticker):
     return jsonify({"ticker": ticker, "history": history, "status": "historical_only"})
 
 
+@api.route("/price-forecast/<ticker>")
+def price_forecast(ticker):
+    """Precomputed Prophet forecast (fit on daily closes, data/models/forecast_*.csv,
+    built by examples/build_forecasts.py) for one ticker.
+
+    This is a SEPARATE, independent signal from both /live/quote (today's
+    actual traded price) and /signal (the sector LSTM/XGBoost Buy-Sell-Hold
+    classifier) -- it never overrides either. The stock page renders it in
+    its own container precisely so a stale forecast snapshot is never
+    confused with today's live price.
+
+    Deliberately NOT fit live here: Prophet takes a few seconds per ticker,
+    far too slow for a request. 404s for any ticker the batch script skipped
+    (not enough price history) or hasn't covered yet.
+    """
+    ticker = ticker.upper()
+
+    summary_path = MODELS_DIR / "forecast_summary.csv"
+    daily_path = MODELS_DIR / "forecast_daily.csv"
+    if not summary_path.exists() or not daily_path.exists():
+        return jsonify({"ticker": ticker, "status": "not_available",
+                         "error": "forecast data has not been generated yet"}), 404
+
+    summary_row = None
+    with open(summary_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row["ticker"].strip().upper() == ticker:
+                summary_row = row
+                break
+    if summary_row is None:
+        return jsonify({"ticker": ticker, "status": "not_available",
+                         "error": "no forecast for this ticker (too little price "
+                                  "history, or not yet covered by the forecast batch)"}), 404
+
+    days = []
+    with open(daily_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row["ticker"].strip().upper() != ticker:
+                continue
+            days.append({
+                "day_offset": int(row["day_offset"]),
+                "date": row["date"],
+                "forecast_price": float(row["forecast_price"]),
+                "lower_bound": float(row["lower_bound"]),
+                "upper_bound": float(row["upper_bound"]),
+                "change_pct": float(row["change_pct"]) if row["change_pct"] not in (None, "") else None,
+            })
+    days.sort(key=lambda d: d["day_offset"])
+
+    return jsonify({
+        "ticker": ticker,
+        "status": "ok",
+        "current_price": float(summary_row["current_price"]),
+        "horizon_days": int(summary_row["horizon_days"]),
+        "rows_used": int(summary_row["rows_used"]),
+        "generated_at": summary_row["generated_at"],
+        "days": days,
+    })
+
+
 @api.route("/signal/<ticker>")
 def signal(ticker):
     ticker = ticker.upper()

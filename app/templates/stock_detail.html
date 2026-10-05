@@ -92,12 +92,40 @@
     Our data is end-of-day only (one close per trading day), so 1D/1W show the last few daily closes rather than intraday movement.
   </p>
 </div>
+
+<div class="card-panel" id="forecast-panel" style="display:none;">
+  <h3 style="border-bottom:none; margin-bottom:6px;">Price Forecast</h3>
+  <div class="limitation-note" style="margin-bottom:12px;">
+    A statistical forecast (Prophet, fit on this ticker's daily closing prices) -- a separate
+    model from the Buy/Sell/Hold signal above, and independent of the live price shown at the
+    top of this page. It updates only when the forecast batch is re-run, not in real time.
+    Treat it as illustrative, especially for tickers with limited price history.
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3">
+      <div class="stat-tile sm"><div class="label">Snapshot Price</div><div class="value" id="forecast-current">—</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-tile sm"><div class="label">30-Day Forecast</div><div class="value" id="forecast-price">—</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-tile sm"><div class="label">Lower Bound</div><div class="value" id="forecast-lower">—</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="stat-tile sm"><div class="label">Upper Bound</div><div class="value" id="forecast-upper">—</div></div>
+    </div>
+  </div>
+  <div id="forecast-chart" style="width:100%; min-height:460px;"></div>
+  <p class="text-dim" style="font-size:0.75rem; margin-top:8px;" id="forecast-meta"></p>
+</div>
 {% endif %}
 
 {% endblock %}
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
 <script>
   {% if has_history %}loadStockDetail("{{ ticker }}");{% endif %}
   initLiveQuote("{{ ticker }}");
+  {% if has_history %}initForecast("{{ ticker }}");{% endif %}
 </script>
 {% endblock %}

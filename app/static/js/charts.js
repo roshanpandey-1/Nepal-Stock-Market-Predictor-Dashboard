@@ -9,14 +9,30 @@ function _computeChartColors() {
     const v = cs.getPropertyValue(name);
     return v && v.trim() ? v.trim() : fallback;
   };
+  const red = get("--red", "#ef4444");
   return {
     accent: get("--accent", "#1d6fd6"),
     green: get("--green", "#22c55e"),
-    red: get("--red", "#ef4444"),
+    red: red,
+    redFillTransparent: _hexToRgba(red, 0.15),
     amber: get("--amber", "#f5a623"),
     grid: get("--border", "rgba(11,46,79,0.08)"),
     text: get("--text-dim", "#6b7686"),
   };
+}
+
+function _hexToRgba(hex, alpha) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return `rgba(239,68,68,${alpha})`; // fallback: --red default
+  const [r, g, b] = [m[1], m[2], m[3]].map(h => parseInt(h, 16));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function _isDarkTheme() {
+  const t = _currentTheme();
+  if (t === "dark") return true;
+  if (t === "light") return false;
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
 }
 
 // Mutated in place (never reassigned) so every chart config/plugin that
@@ -885,3 +901,144 @@ function wireNavSearch() {
 }
 
 wireNavSearch();
+
+// ── Price Forecast chart (stock detail page) ────────────────────────────
+// Mirrors notebooks/04_forecasting_models.ipynb: actual price history (last
+// ~180 days) + the forecast's dashed line + a shaded confidence band, with
+// Plotly's built-in range slider and 1W/1M/3M/6M/All zoom buttons. Fetches
+// its own two endpoints once and keeps its own Plotly figure -- deliberately
+// separate from initLiveQuote()/loadStockDetail() above, so it never touches
+// or is touched by the live-quote polling or the Chart.js price-history chart.
+let _forecastHistory = null;   // [{date, close}, ...] from /api/forecast (reused -- see note in app/api.py)
+let _forecastDays = null;      // [{date, forecast_price, lower_bound, upper_bound}, ...]
+
+function _forecastPlotlyLayout() {
+  const c = CHART_COLORS;
+  const dark = _isDarkTheme();
+  return {
+    title: { text: "", font: { color: c.text } },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: { color: c.text, family: "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
+    margin: { l: 55, r: 130, t: 30, b: 40 },
+    hovermode: "x unified",
+    showlegend: true,
+    // Vertical, docked to the right of the plot -- the range-selector
+    // buttons (1W/1M/3M/6M/All) already occupy the top-left above the
+    // plot, so a horizontal top legend collided with them. Right margin
+    // above is widened to make room for this legend outside the plot area.
+    legend: { orientation: "v", x: 1.02, xanchor: "left", y: 1, yanchor: "top", font: { color: c.text } },
+    xaxis: {
+      gridcolor: c.grid, zerolinecolor: c.grid, color: c.text,
+      rangeslider: { visible: true, bgcolor: "rgba(0,0,0,0)", bordercolor: c.grid, thickness: 0.08 },
+      rangeselector: {
+        x: 0, xanchor: "left", y: 1.12, yanchor: "bottom",
+        bgcolor: dark ? "#1a1a1a" : "#f0f2f5",
+        activecolor: c.accent,
+        font: { color: c.text },
+        buttons: [
+          { count: 7, label: "1W", step: "day", stepmode: "backward" },
+          { count: 1, label: "1M", step: "month", stepmode: "backward" },
+          { count: 3, label: "3M", step: "month", stepmode: "backward" },
+          { count: 6, label: "6M", step: "month", stepmode: "backward" },
+          { step: "all", label: "All" },
+        ],
+      },
+    },
+    yaxis: { title: "Price (Rs.)", gridcolor: c.grid, zerolinecolor: c.grid, color: c.text },
+  };
+}
+
+function _forecastPlotlyTraces() {
+  const c = CHART_COLORS;
+  const hist = _forecastHistory || [];
+  const days = _forecastDays || [];
+
+  return [
+    {
+      x: hist.map(h => h.date), y: hist.map(h => h.close),
+      name: "Actual Price", mode: "lines",
+      line: { color: c.accent, width: 2 },
+      hovertemplate: "<b>%{x}</b><br>Price: Rs. %{y:.1f}<extra></extra>",
+    },
+    {
+      x: days.map(d => d.date), y: days.map(d => d.forecast_price),
+      name: "Forecast", mode: "lines",
+      line: { color: c.red, width: 2, dash: "dash" },
+      hovertemplate: "<b>%{x}</b><br>Forecast: Rs. %{y:.1f}<extra></extra>",
+    },
+    {
+      x: days.map(d => d.date), y: days.map(d => d.upper_bound),
+      name: "Upper Bound", mode: "lines",
+      line: { width: 0 }, showlegend: false,
+      hovertemplate: "Upper: Rs. %{y:.1f}<extra></extra>",
+    },
+    {
+      x: days.map(d => d.date), y: days.map(d => d.lower_bound),
+      name: "Confidence Interval", mode: "lines",
+      line: { width: 0 }, fill: "tonexty", fillcolor: c.redFillTransparent,
+      hovertemplate: "Lower: Rs. %{y:.1f}<extra></extra>",
+    },
+  ];
+}
+
+function _renderForecastChart() {
+  const el = document.getElementById("forecast-chart");
+  if (!el || typeof Plotly === "undefined") return;
+  Plotly.react(el, _forecastPlotlyTraces(), _forecastPlotlyLayout(), {
+    responsive: true,
+    displaylogo: false,
+    // Drop the camera/download-image button and the box-zoom drag-mode
+    // tool -- the +/- buttons already next to them cover zooming.
+    modeBarButtonsToRemove: ["toImage", "zoom2d"],
+  });
+}
+_registerThemeRedraw("forecast-chart", () => {
+  if (_forecastDays) _renderForecastChart();
+});
+
+async function initForecast(ticker) {
+  const panel = document.getElementById("forecast-panel");
+  const chartEl = document.getElementById("forecast-chart");
+  if (!panel || !chartEl) return;
+
+  try {
+    const [histRes, fcRes] = await Promise.all([
+      fetch(`/api/forecast/${ticker}`),
+      fetch(`/api/price-forecast/${ticker}`),
+    ]);
+    const fc = await fcRes.json();
+    if (fc.status !== "ok" || !fc.days || !fc.days.length) {
+      panel.style.display = "none";
+      return;
+    }
+    const hist = await histRes.json();
+
+    // Last ~180 days of actual closes, same cutoff as the notebook, so the
+    // chart reads as "recent history -> forecast" rather than the full
+    // multi-year series dwarfing the 30-day forecast window.
+    _forecastHistory = (hist.history || []).slice(-180);
+    _forecastDays = fc.days;
+
+    panel.style.display = "";
+    _renderForecastChart();
+
+    const currentEl = document.getElementById("forecast-current");
+    const priceEl = document.getElementById("forecast-price");
+    const lowerEl = document.getElementById("forecast-lower");
+    const upperEl = document.getElementById("forecast-upper");
+    const lastDay = fc.days[fc.days.length - 1];
+    if (currentEl) currentEl.textContent = `Rs. ${fc.current_price}`;
+    if (priceEl) priceEl.textContent = `Rs. ${lastDay.forecast_price}`;
+    if (lowerEl) lowerEl.textContent = `Rs. ${lastDay.lower_bound}`;
+    if (upperEl) upperEl.textContent = `Rs. ${lastDay.upper_bound}`;
+
+    const metaEl = document.getElementById("forecast-meta");
+    if (metaEl) {
+      metaEl.textContent = `Snapshot price at forecast time: Rs. ${fc.current_price} `
+        + `(forecast generated ${fc.generated_at}, based on ${fc.rows_used} days of history).`;
+    }
+  } catch (e) {
+    panel.style.display = "none";
+  }
+}
