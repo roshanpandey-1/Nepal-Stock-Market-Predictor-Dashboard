@@ -34,14 +34,25 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # --- tunables ---------------------------------------------------------------
-FETCH_TIMEOUT_SECONDS = 12      # hard deadline for any single NEPSE call
+FETCH_TIMEOUT_SECONDS = 12      # hard deadline for most single NEPSE calls
+# getLiveMarket returns every traded scrip (~330 rows) in one response --
+# much heavier than the other endpoints, which are a handful of rows each.
+# It was sharing the same 12s deadline and would intermittently time out
+# under that budget (especially on Render's free tier), silently dropping
+# every per-ticker live quote, Top Turnover and live breadth for that
+# fetch cycle while the small getNepseIndex call kept succeeding -- which
+# is why the navbar index could look live while a stock page still showed
+# a stale end-of-day quote.
+LIVE_MARKET_TIMEOUT_SECONDS = 30
 CACHE_TTL_SECONDS = 60          # serve cached data for this long
 CIRCUIT_FAILURE_THRESHOLD = 3   # consecutive failures before tripping
 CIRCUIT_COOLDOWN_SECONDS = 600  # stop trying for this long once tripped
 
 _client = None
 _client_lock = threading.Lock()
-_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="nepse-live")
+# One worker per endpoint fetch_live_snapshot() makes (7), so all of them
+# run concurrently instead of one slow call pushing the rest out serially.
+_executor = ThreadPoolExecutor(max_workers=7, thread_name_prefix="nepse-live")
 
 _cache = {"data": None, "ts": 0.0}
 _circuit = {"failures": 0, "open_until": 0.0}
@@ -94,17 +105,17 @@ def _record_success():
     _last_error.update(kind=None, detail=None)
 
 
-def _call(method_name):
+def _call(method_name, timeout=FETCH_TIMEOUT_SECONDS):
     """Call one client method under a hard deadline. Returns None on any failure."""
     if _circuit_open():
         return None
     try:
         future = _executor.submit(lambda: getattr(_get_client(), method_name)())
-        result = future.result(timeout=FETCH_TIMEOUT_SECONDS)
+        result = future.result(timeout=timeout)
         _record_success()
         return result
     except FutureTimeout:
-        logger.warning("NEPSE %s timed out after %ss", method_name, FETCH_TIMEOUT_SECONDS)
+        logger.warning("NEPSE %s timed out after %ss", method_name, timeout)
         _last_error.update(kind="timeout", detail=f"{method_name} timed out")
         _record_failure()
     except ImportError as exc:
@@ -119,6 +130,51 @@ def _call(method_name):
         _last_error.update(kind="network", detail=f"{type(exc).__name__}: {exc}")
         _record_failure()
     return None
+
+
+def _call_all(specs):
+    """Call several client methods concurrently instead of one after another.
+
+    `specs` is a list of (method_name, timeout) pairs. Every call is
+    submitted to the executor up front, so a slow endpoint (getLiveMarket,
+    with its ~330-row response) does not delay the others from starting --
+    the old sequential version effectively summed every call's timeout in
+    the worst case. Returns {method_name: result_or_None}, and records one
+    success/failure against the circuit breaker for the whole batch (a
+    partial fetch -- e.g. the index but not live quotes -- still counts as
+    NEPSE being reachable).
+    """
+    if _circuit_open():
+        return {name: None for name, _ in specs}
+
+    futures = {
+        name: _executor.submit(lambda n=name: getattr(_get_client(), n)())
+        for name, _timeout in specs
+    }
+    results = {}
+    any_success = False
+    for name, timeout in specs:
+        try:
+            results[name] = futures[name].result(timeout=timeout)
+            any_success = True
+        except FutureTimeout:
+            logger.warning("NEPSE %s timed out after %ss", name, timeout)
+            _last_error.update(kind="timeout", detail=f"{name} timed out")
+            results[name] = None
+        except ImportError as exc:
+            logger.warning("NEPSE client import failed: %s", exc)
+            _last_error.update(kind="library", detail=str(exc))
+            results[name] = None
+        except Exception as exc:
+            logger.warning("NEPSE %s failed: %s: %s", name, type(exc).__name__, exc)
+            _last_error.update(kind="network", detail=f"{type(exc).__name__}: {exc}")
+            results[name] = None
+
+    if any_success:
+        _record_success()
+    else:
+        _record_failure()
+    return results
 
 
 def _failure_reason():
@@ -300,6 +356,48 @@ def _live_quotes_by_symbol(rows):
     return quotes
 
 
+def _quotes_from_price_volume(rows):
+    """Per-symbol quote map from getPriceVolume -- NEPSE's end-of-day
+    price/volume summary.
+
+    Unlike getLiveMarket (which empties out once the market closes for the
+    day -- confirmed 2026-09-23: getLiveMarket returned 0 rows with the
+    market closed, while getPriceVolume still returned 278), this endpoint
+    keeps serving today's close, previous close, % change and volume all
+    day. It has no Open/High/Low/Turnover fields, so those stay None here;
+    used only to fill in tickers getLiveMarket didn't cover, never to
+    override a fuller getLiveMarket row.
+    """
+    if not isinstance(rows, list):
+        return {}
+    quotes = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        symbol = _pick(row, "symbol")
+        ltp = _num(_pick(row, "lastTradedPrice", "closePrice"))
+        if not symbol or ltp is None:
+            continue
+        prev = _num(_pick(row, "previousClose"))
+        change = round(ltp - prev, 2) if prev is not None else None
+        quotes[str(symbol).strip().upper()] = {
+            "ticker": str(symbol).strip().upper(),
+            "name": (str(_pick(row, "securityName") or "").strip() or None),
+            "ltp": round(ltp, 2),
+            "change": change,
+            "change_pct": _num(_pick(row, "percentageChange")),
+            "open": None,
+            "high": None,
+            "low": None,
+            "prev_close": prev,
+            "volume": _num(_pick(row, "totalTradeQuantity")),
+            "turnover": None,
+            "avg_price": None,
+            "last_qty": None,
+        }
+    return quotes
+
+
 def _live_breadth(rows):
     """Advancing / declining / unchanged across every live scrip.
 
@@ -355,10 +453,23 @@ def _normalise_index(payload):
     }
 
 
+# getNepseIndex returns every index NEPSE tracks in one list -- the broad
+# market indices *and* the same per-sector sub-indices that getNepseSubIndices
+# also returns (and that the "Sector Indices" panel already renders further
+# down the dashboard). Left unfiltered, each sector index showed up twice --
+# once in the compact top strip, once in the Sector Indices panel. The strip
+# is only meant for the broad, whole-market indices, so sector ones are kept
+# out of it here.
+_BROAD_MARKET_INDICES = {"nepse index", "sensitive index", "float index", "sensitive float index"}
+
+
 def _normalise_all_indices(payload):
-    """All rows NEPSE returns from getNepseIndex (NEPSE, Sensitive, Float,
-    Sensitive Float, ...) -- not just the headline one _normalise_index
-    picks out. Used for the dashboard's compact "Indices" strip.
+    """Broad market rows from getNepseIndex (NEPSE, Sensitive, Float,
+    Sensitive Float) for the dashboard's compact "Indices" strip.
+
+    getNepseIndex's payload also includes every per-sector sub-index, but
+    those are deliberately excluded here -- they're already shown, once,
+    in the "Sector Indices" panel (built from getNepseSubIndices).
     """
     if not isinstance(payload, list):
         return []
@@ -366,11 +477,14 @@ def _normalise_all_indices(payload):
     for row in payload:
         if not isinstance(row, dict):
             continue
+        name = str(_pick(row, "index", "indexName") or "Index")
+        if name.strip().lower() not in _BROAD_MARKET_INDICES:
+            continue
         value = _num(_pick(row, "currentValue", "close", "indexValue"))
         if value is None:
             continue
         out.append({
-            "name": str(_pick(row, "index", "indexName") or "Index"),
+            "name": name,
             "value": round(value, 2),
             "change_pct": _num(_pick(row, "perChange", "percentageChange")),
         })
@@ -420,24 +534,45 @@ def fetch_live_snapshot():
         snapshot["reason"] = "NEPSE unreachable recently; retrying later"
         return snapshot
 
-    status = _call("getMarketStatus")
-    index = _call("getNepseIndex")
-    gainers = _call("getTopGainers")
-    losers = _call("getTopLosers")
-    live = _call("getLiveMarket")
-    history = _call("getDailyNepseIndexGraph")
-    subindices = _call("getNepseSubIndices")
+    results = _call_all([
+        ("getMarketStatus", FETCH_TIMEOUT_SECONDS),
+        ("getNepseIndex", FETCH_TIMEOUT_SECONDS),
+        ("getTopGainers", FETCH_TIMEOUT_SECONDS),
+        ("getTopLosers", FETCH_TIMEOUT_SECONDS),
+        ("getLiveMarket", LIVE_MARKET_TIMEOUT_SECONDS),
+        ("getPriceVolume", FETCH_TIMEOUT_SECONDS),
+        ("getDailyNepseIndexGraph", FETCH_TIMEOUT_SECONDS),
+        ("getNepseSubIndices", FETCH_TIMEOUT_SECONDS),
+    ])
+    status = results["getMarketStatus"]
+    index = results["getNepseIndex"]
+    gainers = results["getTopGainers"]
+    losers = results["getTopLosers"]
+    live = results["getLiveMarket"]
+    price_volume = results["getPriceVolume"]
+    history = results["getDailyNepseIndexGraph"]
+    subindices = results["getNepseSubIndices"]
 
-    if all(x is None for x in (status, index, gainers, losers, live, history, subindices)):
+    if all(x is None for x in results.values()):
         snapshot["reason"] = _failure_reason()
         return snapshot
 
     snapshot["market_open"] = _market_open(status)
     snapshot["index"] = _normalise_index(index)
     snapshot["all_indices"] = _normalise_all_indices(index)
-    snapshot["breadth"] = _live_breadth(live)
+    # getLiveMarket is a genuine tick feed -- NEPSE empties it out once the
+    # market closes for the day (confirmed 2026-09-23: 0 rows with the
+    # market closed). getPriceVolume keeps serving today's close/volume/%
+    # change/previous-close all day, so it backs up both breadth and
+    # per-ticker quotes whenever getLiveMarket has nothing.
+    snapshot["breadth"] = _live_breadth(live) or _live_breadth(price_volume)
+
+    quotes = _live_quotes_by_symbol(live)
+    for ticker, q in _quotes_from_price_volume(price_volume).items():
+        quotes.setdefault(ticker, q)
+    snapshot["_quotes"] = quotes
+
     snapshot["index_history"] = _normalise_index_history(history)
-    snapshot["_quotes"] = _live_quotes_by_symbol(live)
     snapshot["subindices"] = _normalise_subindices(subindices)
     snapshot["top_turnover"] = _top_turnover(snapshot["_quotes"])
 
@@ -445,6 +580,30 @@ def fetch_live_snapshot():
         rows = payload if isinstance(payload, list) else []
         cleaned = [m for m in (_normalise_mover(r) for r in rows) if m]
         snapshot[key] = cleaned[:10]
+
+    # getTopGainers/getTopLosers cover every instrument NEPSE trades,
+    # including debentures/mutual funds that getLiveMarket and getPriceVolume
+    # don't carry a quote for -- which used to leave clicking one of those
+    # movers on a dead "Not Found" page (stock_detail()'s intended live-only
+    # fallback needs a quote to render). Fold the movers themselves in as a
+    # last-resort quote source so every mover shown has somewhere to land.
+    for payload in (snapshot["gainers"], snapshot["losers"]):
+        for mover in payload:
+            snapshot["_quotes"].setdefault(mover["ticker"], {
+                "ticker": mover["ticker"],
+                "name": mover["name"],
+                "ltp": mover["ltp"],
+                "change": mover["change"],
+                "change_pct": mover["change_pct"],
+                "open": None,
+                "high": None,
+                "low": None,
+                "prev_close": None,
+                "volume": mover["volume"],
+                "turnover": None,
+                "avg_price": None,
+                "last_qty": None,
+            })
 
     snapshot["available"] = bool(
         snapshot["index"] or snapshot["gainers"] or snapshot["losers"]

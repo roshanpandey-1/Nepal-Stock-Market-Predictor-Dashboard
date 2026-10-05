@@ -478,7 +478,71 @@ function renderLiveMarket(data) {
   renderSubIndices(data.subindices);
   _renderIndicesStrip(data.all_indices);
   _renderTopTurnover(data.top_turnover);
+  _layoutIndicesRow();
+  _renderNavIndex(data);
 }
+
+// When the Top Turnover panel has nothing to show, its column stays
+// display:none but Bootstrap's grid still reserves its width -- Sector
+// Indices was left looking cramped against a dead strip of empty page.
+// Let Sector Indices claim the full row instead when that happens.
+function _layoutIndicesRow() {
+  const subCol = document.getElementById("subindex-col");
+  const turnoverPanel = document.getElementById("turnover-panel");
+  if (!subCol) return;
+  const turnoverVisible = turnoverPanel && turnoverPanel.style.display !== "none";
+  subCol.classList.toggle("col-md-8", turnoverVisible);
+  subCol.classList.toggle("col-12", !turnoverVisible);
+}
+
+// --- NEPSE index badge in the navbar -----------------------------------
+// Shown on every page (not just the dashboard), so it polls /api/live on
+// its own rather than piggybacking only on the dashboard's live panel.
+
+function _renderNavIndex(data) {
+  const wrap = document.getElementById("nav-index");
+  if (!wrap) return;
+  if (!data || !data.available || !data.index) {
+    wrap.style.display = "none";
+    return;
+  }
+  wrap.style.display = "";
+  const idx = data.index;
+  const up = (idx.change_pct ?? 0) >= 0;
+  const sign = up ? "+" : "";
+  const arrow = up ? "▲" : "▼";
+  wrap.className = "nav-index " + (up ? "pos" : "neg");
+  const dot = document.getElementById("nav-index-dot");
+  if (dot) dot.className = "nav-index-dot " + (data.market_open ? "on" : "off");
+  const valueEl = document.getElementById("nav-index-value");
+  if (valueEl) valueEl.textContent = idx.value;
+  const chgEl = document.getElementById("nav-index-change");
+  if (chgEl) {
+    const chg = idx.change == null ? "" : `${sign}${idx.change}`;
+    const pct = idx.change_pct == null ? "" : `${arrow} ${sign}${idx.change_pct}%`;
+    chgEl.textContent = [chg, pct].filter(Boolean).join("  ");
+  }
+}
+
+async function _pollNavIndex() {
+  const wrap = document.getElementById("nav-index");
+  if (!wrap) return;
+  // Skip if the dashboard's own live panel is already on this page and
+  // will call _renderNavIndex itself from the same /api/live response.
+  if (document.getElementById("live-panel")) return;
+  try {
+    const res = await fetch("/api/live");
+    _renderNavIndex(await res.json());
+  } catch (e) {
+    wrap.style.display = "none";
+  }
+}
+
+function initNavIndex() {
+  _pollNavIndex();
+  setInterval(_pollNavIndex, LIVE_POLL_MS);
+}
+initNavIndex();
 
 // --- Upgrade the end-of-day sections with live data ------------------------
 // The server renders yesterday's close so the page is useful immediately (and

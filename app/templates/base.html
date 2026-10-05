@@ -40,8 +40,8 @@
   {% endif %}
 
   <nav class="navbar navbar-expand-lg">
-    <div class="container-main d-flex w-100">
-      <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">🇳🇵 NEPSE Intelligence</a>
+    <div class="container-main d-flex w-100" style="position:relative;">
+      <a class="navbar-brand" href="{{ url_for('main.dashboard') }}"> NEPSE Intelligence</a>
 
       <form class="nav-search" id="nav-search-form" autocomplete="off" role="search">
         <input type="text" id="nav-search-input"
@@ -50,6 +50,13 @@
                aria-controls="nav-search-results">
         <div class="nav-search-results" id="nav-search-results" role="listbox"></div>
       </form>
+
+      <div class="nav-index mx-auto" id="nav-index" style="display:none;">
+        <span class="nav-index-dot" id="nav-index-dot"></span>
+        <span class="nav-index-name">NEPSE</span>
+        <span class="nav-index-value" id="nav-index-value">—</span>
+        <span class="nav-index-change" id="nav-index-change"></span>
+      </div>
 
       <div class="ms-auto d-flex align-items-center gap-3">
         <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">Dashboard</a>

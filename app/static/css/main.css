@@ -26,50 +26,50 @@
    prefers dark (media query below). Chart colors are read live from these
    custom properties by charts.js so charts recolor on theme switch too. */
 :root[data-theme="dark"] {
-  --navy: #13304d;
-  --navy-dark: #0a1c2e;
-  --bg: #080c12;
-  --card-bg: #131c29;
-  --border: #2b3a4d;
+  --navy: #262626;
+  --navy-dark: #1a1a1a;
+  --bg: #000000;
+  --card-bg: #121212;
+  --border: #2a2a2a;
   --text: #e6ebf1;
-  --text-dim: #90a0b3;
+  --text-dim: #92979f;
   --green: #34d399;
   --red: #f87171;
   --amber: #fbbf24;
   --accent: #5b9bf0;
-  --heading: #f1f5f9;
-  --row-hover: #1f2a3a;
-  --neutral-bg: #1f2a3a;
-  --input-bg: #182231;
-  --limitation-bg: #2b2210;
+  --heading: #f5f5f5;
+  --row-hover: #1c1c1c;
+  --neutral-bg: #1a1a1a;
+  --input-bg: #161616;
+  --limitation-bg: #241d10;
   --limitation-border: #6b4a12;
   --limitation-text: #f3c675;
-  --shadow: rgba(0,0,0,0.28);
+  --shadow: rgba(0,0,0,0.5);
 
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
-    --navy: #13304d;
-    --navy-dark: #0a1c2e;
-    --bg: #080c12;
-    --card-bg: #131c29;
-    --border: #2b3a4d;
+    --navy: #262626;
+    --navy-dark: #1a1a1a;
+    --bg: #000000;
+    --card-bg: #121212;
+    --border: #2a2a2a;
     --text: #e6ebf1;
-    --text-dim: #90a0b3;
+    --text-dim: #92979f;
     --green: #34d399;
     --red: #f87171;
     --amber: #fbbf24;
     --accent: #5b9bf0;
-    --heading: #f1f5f9;
-    --row-hover: #1f2a3a;
-    --neutral-bg: #1f2a3a;
-    --input-bg: #182231;
-    --limitation-bg: #2b2210;
+    --heading: #f5f5f5;
+    --row-hover: #1c1c1c;
+    --neutral-bg: #1a1a1a;
+    --input-bg: #161616;
+    --limitation-bg: #241d10;
     --limitation-border: #6b4a12;
     --limitation-text: #f3c675;
-    --shadow: rgba(0,0,0,0.28);
+    --shadow: rgba(0,0,0,0.5);
 
     color-scheme: dark;
   }
@@ -167,7 +167,41 @@ a.ticker-item:hover .sym { text-decoration: underline; }
   border-radius: 2px;
 }
 
-.container-main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
+/* NEPSE index badge, centered in the navbar (ShareHub-style). */
+.nav-index {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.86rem;
+  white-space: nowrap;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0 !important; /* override the .mx-auto utility now that this is absolutely centered */
+}
+.nav-index-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64748b;
+  flex-shrink: 0;
+}
+.nav-index-dot.on { background: #f87171; }
+.nav-index-dot.off { background: #64748b; }
+.nav-index-name { color: #b9c6d6; font-weight: 600; }
+.nav-index-value { color: #fff; font-weight: 600; }
+.nav-index.pos .nav-index-change { color: #4ade80; }
+.nav-index.neg .nav-index-change { color: #f87171; }
+@media (max-width: 900px) {
+  .nav-index { display: none !important; }
+}
+
+.container-main { max-width: 1500px; margin: 0 auto; padding: 20px 24px 60px; }
 
 .card-panel {
   background: var(--card-bg);
@@ -456,7 +490,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid rgba(255,255,255,0.16);
   color: #fff;
   border-radius: 999px;
-  padding: 4px 14px;
+  padding: 7px 14px;
   font-size: 0.82rem;
   width: 260px;
   outline: none;
