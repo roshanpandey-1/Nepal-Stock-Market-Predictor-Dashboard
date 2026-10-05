@@ -74,7 +74,7 @@ def create_sequences(X, y, seq_len):
     return np.array(Xs), np.array(ys)
 
 
-def train_lstm(X_seq, y_seq, input_dim, class_weights=None):
+def train_lstm(X_seq, y_seq, input_dim, class_weights=None, max_epochs=1000, patience=30):
     import torch
     import torch.nn as nn
     import torch.optim as optim
@@ -110,12 +110,11 @@ def train_lstm(X_seq, y_seq, input_dim, class_weights=None):
     optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100)
 
-    patience = 30
     best_acc = 0
     best_weights = None
     no_improve = 0
 
-    for epoch in range(1000):
+    for epoch in range(max_epochs):
         model.train()
         for X_batch, y_batch in train_dl:
             optimizer.zero_grad()
@@ -176,6 +175,10 @@ def main():
     ap.add_argument('--suffix', default='',
                      help='Extra suffix on output filenames, e.g. "_cw", so a '
                           'class-weighted run does not overwrite the unweighted one.')
+    ap.add_argument('--max-epochs', type=int, default=1000,
+                     help='Hard cap on LSTM training epochs, independent of early '
+                          'stopping -- useful to bound wall-clock time on a big sector '
+                          '(e.g. Hydro Power) in a resource-constrained environment.')
     args = ap.parse_args()
 
     sector_dfs = load_sector_data(args.sector)
@@ -238,7 +241,7 @@ def main():
                         f"from counts {dict(zip(classes.tolist(), counts.tolist()))}")
 
         import torch
-        model, acc, preds, y_test = train_lstm(X_seq, y_seq, X_seq.shape[2], class_weights=class_weights)
+        model, acc, preds, y_test = train_lstm(X_seq, y_seq, X_seq.shape[2], class_weights=class_weights, max_epochs=args.max_epochs)
         print(classification_report(y_test, preds, target_names=['Sell', 'Hold', 'Buy']))
 
         model_path = f"{args.out_dir}/{sector_name}_lstm_model_oos{args.suffix}.pth"
