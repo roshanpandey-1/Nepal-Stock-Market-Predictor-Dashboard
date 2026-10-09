@@ -29,7 +29,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -201,6 +201,13 @@ def _num(value):
         return None
 
 
+def _pct(value):
+    """Percent-change value rounded to 3 decimals (NEPSE sometimes sends
+    unrounded floats like 5.850681981); None passes through."""
+    n = _num(value)
+    return None if n is None else round(n, 3)
+
+
 def _pick(row, *keys):
     """First present, non-empty value among `keys` (field names vary by endpoint)."""
     for key in keys:
@@ -237,7 +244,7 @@ def _normalise_mover(row):
         "ticker": str(symbol).strip().upper(),
         "name": (str(_pick(row, "securityName") or "").strip() or None),
         "ltp": round(ltp, 2),
-        "change_pct": _num(_pick(row, "percentageChange", "perChange", "percentChange")),
+        "change_pct": _pct(_pick(row, "percentageChange", "perChange", "percentChange")),
         "change": change,
         "volume": _num(_pick(row, "totalTradeQuantity", "totalTradedQuantity", "shareTraded")),
     }
@@ -313,7 +320,7 @@ def _normalise_subindices(rows):
             "name": name,
             "value": round(value, 2),
             "change": _num(_pick(row, "change", "pointChange")),
-            "change_pct": _num(_pick(row, "perChange", "percentageChange")),
+            "change_pct": _pct(_pick(row, "perChange", "percentageChange")),
             "model_sector": _SUBINDEX_TO_MODEL_SECTOR.get(name.lower()),
         })
     out.sort(key=lambda r: (r["change_pct"] is None, -(r["change_pct"] or 0)))
@@ -385,7 +392,7 @@ def _quotes_from_price_volume(rows):
             "name": (str(_pick(row, "securityName") or "").strip() or None),
             "ltp": round(ltp, 2),
             "change": change,
-            "change_pct": _num(_pick(row, "percentageChange")),
+            "change_pct": _pct(_pick(row, "percentageChange")),
             "open": None,
             "high": None,
             "low": None,
@@ -396,6 +403,69 @@ def _quotes_from_price_volume(rows):
             "last_qty": None,
         }
     return quotes
+
+
+_todays_price_cache = {"rows": None, "ts": 0.0}
+TODAYS_PRICE_TTL_SECONDS = 600  # day's OHLC barely changes once the market is closed
+
+
+def _fetch_todays_price():
+    """NEPSE's per-security "today's price" table (open/high/low/close/
+    turnover) for the latest trading day, or None.
+
+    getLiveMarket (the only feed with open/high/low/turnover) empties out when
+    the market closes, and getPriceVolume carries only close/volume -- so the
+    stock page's Open/High/Low/Turnover tiles went blank after hours. This
+    endpoint keeps the full day's figures. It takes a business date, so walk
+    back from today (Nepal time) until a day returns rows -- weekends and
+    holidays have none. Cached because it only changes once per session.
+    """
+    now = time.time()
+    if _todays_price_cache["rows"] and (now - _todays_price_cache["ts"]) < TODAYS_PRICE_TTL_SECONDS:
+        return _todays_price_cache["rows"]
+    if _circuit_open():
+        return _todays_price_cache["rows"]
+
+    nepal_today = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=45)).date()
+    for days_back in range(0, 6):
+        day = (nepal_today - timedelta(days=days_back)).isoformat()
+        try:
+            future = _executor.submit(lambda d=day: _get_client().getPriceVolumeHistory(d))
+            data = future.result(timeout=FETCH_TIMEOUT_SECONDS)
+        except Exception as exc:  # timeout, network, library -- degrade quietly
+            logger.warning("NEPSE getPriceVolumeHistory(%s) failed: %s: %s",
+                           day, type(exc).__name__, exc)
+            return _todays_price_cache["rows"]
+        rows = data.get("content") if isinstance(data, dict) else data
+        if isinstance(rows, list) and rows:
+            _todays_price_cache.update(rows=rows, ts=now)
+            return rows
+    return _todays_price_cache["rows"]
+
+
+def _quotes_from_todays_price(rows):
+    """symbol -> {open, high, low, turnover, volume, ...} from the
+    today's-price table. Field names vary a little, hence the _pick fallbacks."""
+    if not isinstance(rows, list):
+        return {}
+    out = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        symbol = _pick(row, "symbol", "securitySymbol")
+        if not symbol:
+            continue
+        out[str(symbol).strip().upper()] = {
+            "open": _num(_pick(row, "openPrice", "open")),
+            "high": _num(_pick(row, "highPrice", "high")),
+            "low": _num(_pick(row, "lowPrice", "low")),
+            "ltp": _num(_pick(row, "closePrice", "lastTradedPrice", "close")),
+            "prev_close": _num(_pick(row, "previousDayClosePrice", "previousClose")),
+            "volume": _num(_pick(row, "totalTradedQuantity", "totalTradeQuantity")),
+            "turnover": _num(_pick(row, "totalTradedValue", "totalTradeValue", "turnover")),
+            "avg_price": _num(_pick(row, "averageTradedPrice")),
+        }
+    return out
 
 
 def _live_breadth(rows):
@@ -449,7 +519,7 @@ def _normalise_index(payload):
         "name": str(_pick(row, "index", "indexName") or "NEPSE Index"),
         "value": round(value, 2),
         "change": _num(_pick(row, "change", "pointChange")),
-        "change_pct": _num(_pick(row, "perChange", "percentageChange")),
+        "change_pct": _pct(_pick(row, "perChange", "percentageChange")),
     }
 
 
@@ -486,7 +556,7 @@ def _normalise_all_indices(payload):
         out.append({
             "name": name,
             "value": round(value, 2),
-            "change_pct": _num(_pick(row, "perChange", "percentageChange")),
+            "change_pct": _pct(_pick(row, "perChange", "percentageChange")),
         })
     return out
 
@@ -570,6 +640,18 @@ def fetch_live_snapshot():
     quotes = _live_quotes_by_symbol(live)
     for ticker, q in _quotes_from_price_volume(price_volume).items():
         quotes.setdefault(ticker, q)
+    # After hours getLiveMarket is empty, so quotes come from getPriceVolume
+    # (no open/high/low/turnover). Fill those gaps from the day's final
+    # today's-price table instead of leaving the stock page's tiles blank.
+    if not live:
+        day_rows = _quotes_from_todays_price(_fetch_todays_price())
+        for ticker, q in quotes.items():
+            extra = day_rows.get(ticker)
+            if not extra:
+                continue
+            for field in ("open", "high", "low", "turnover", "avg_price"):
+                if q.get(field) is None:
+                    q[field] = extra.get(field)
     snapshot["_quotes"] = quotes
 
     snapshot["index_history"] = _normalise_index_history(history)

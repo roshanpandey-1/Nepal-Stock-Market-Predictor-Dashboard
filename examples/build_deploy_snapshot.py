@@ -53,7 +53,11 @@ def build_processed():
 
 def build_models():
     OUT_MODELS.mkdir(parents=True, exist_ok=True)
-    patterns = ["*_oos*", "*split_date*", "backtest_summary_oos.csv"]
+    # forecast_*.csv back /api/price-forecast (the stock page's Price Forecast
+    # panel, built by examples/build_forecasts.py) -- without them the panel
+    # 404s and stays hidden on the deployed site.
+    patterns = ["*_oos*", "*split_date*", "backtest_summary_oos.csv",
+                "forecast_summary.csv", "forecast_daily.csv"]
     count = 0
     for pattern in patterns:
         for src in MODELS.glob(pattern):
