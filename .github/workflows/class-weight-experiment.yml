@@ -1,0 +1,77 @@
+name: Class-weight experiment (no deploy)
+
+# Manual only. Trains every sector WITH class weighting and compares it with the
+# deployed model on the same holdout, including the always-Hold baseline and
+# Buy/Sell recall. Nothing is committed and no deployed model is changed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      sectors: ${{ steps.plan.outputs.sectors }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - id: plan
+        run: |
+          pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 loguru >/dev/null
+          echo "sectors=$(python examples/retrain_with_gate.py plan)" >> "$GITHUB_OUTPUT"
+
+  train:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.sectors) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies (CPU-only torch)
+        run: |
+          pip install torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 xgboost==2.0.2 loguru
+      - name: Download full price history
+        run: |
+          gh release download data-latest -p data-snapshot.tar.gz --clobber
+          python examples/data_snapshot.py unpack
+      - name: Train class-weighted candidate, compare with current
+        run: python examples/retrain_with_gate.py run --sector "${{ matrix.sector }}" --out-dir result --class-weight
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cw-${{ matrix.stem }}
+          path: result/decision.json
+          if-no-files-found: ignore
+
+  report:
+    needs: train
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cw-*
+          path: artifacts
+      - name: Comparison table
+        run: |
+          pip install pandas==2.1.3 numpy==1.26.2 scikit-learn==1.3.2 loguru >/dev/null
+          python examples/retrain_with_gate.py report --artifacts artifacts | tee -a "$GITHUB_STEP_SUMMARY"

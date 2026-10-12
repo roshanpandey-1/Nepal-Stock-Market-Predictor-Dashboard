@@ -36,7 +36,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, recall_score
 
 sys.path.append('.')
 from src.models.train_one_sector_v3 import (  # noqa: E402
@@ -50,6 +50,9 @@ XGB_SECTORS = ['Manufacturing And Processing']
 
 REPORT_COLS = ['run_date', 'sector', 'model_type', 'decision', 'reason',
                'old_accuracy', 'new_accuracy', 'old_macro_f1', 'new_macro_f1',
+               'baseline_class', 'baseline_accuracy', 'baseline_macro_f1',
+               'old_buy_recall', 'new_buy_recall', 'old_sell_recall', 'new_sell_recall',
+               'old_nonhold_share', 'new_nonhold_share',
                'holdout_rows', 'holdout_start']
 
 
@@ -129,9 +132,26 @@ def predict(sector, directory, sets, feature_cols):
 
 
 def score(y_true, y_pred):
+    rec = recall_score(y_true, y_pred, labels=[0, 1, 2], average=None, zero_division=0)
     return {'accuracy': round(float(accuracy_score(y_true, y_pred)), 4),
             'macro_f1': round(float(f1_score(y_true, y_pred, average='macro', labels=[0, 1, 2],
-                                             zero_division=0)), 4)}
+                                             zero_division=0)), 4),
+            # recall per class: 0=Sell, 1=Hold, 2=Buy. Buy/Sell recall of 0 means the
+            # model never calls that signal correctly (the "Hold collapse").
+            'sell_recall': round(float(rec[0]), 4), 'hold_recall': round(float(rec[1]), 4),
+            'buy_recall': round(float(rec[2]), 4),
+            # how often the model says anything other than Hold
+            'nonhold_share': round(float(np.mean(np.asarray(y_pred) != 1)), 4)}
+
+
+def baseline(y_true):
+    """Score of the dumbest possible model: always predict the most common class.
+    A real model has to beat this on macro-F1 to be worth anything."""
+    y_true = np.asarray(y_true)
+    majority = int(np.bincount(y_true, minlength=3).argmax())
+    out = score(y_true, np.full_like(y_true, majority))
+    return {'baseline_class': ['Sell', 'Hold', 'Buy'][majority],
+            'baseline_accuracy': out['accuracy'], 'baseline_macro_f1': out['macro_f1']}
 
 
 def gate(old, new, n_rows, min_rows, tol_f1, tol_acc):
@@ -163,6 +183,8 @@ def cmd_run(a):
     try:
         cmd = [sys.executable, 'src/models/train_one_sector_v3.py', '--sector', sector,
                '--type', kind, '--out-dir', str(cand_dir), '--max-epochs', str(a.max_epochs)]
+        if a.class_weight and kind == 'lstm':
+            cmd.append('--class-weight')  # weight the loss by inverse class frequency
         subprocess.run(cmd, check=True)
 
         sets, feature_cols, split = holdout_sets(sector)
@@ -182,7 +204,12 @@ def cmd_run(a):
             'decision': 'promoted' if promote else 'kept_current', 'reason': reason,
             'old_accuracy': old and old['accuracy'], 'new_accuracy': new['accuracy'],
             'old_macro_f1': old and old['macro_f1'], 'new_macro_f1': new['macro_f1'],
+            'old_buy_recall': old and old['buy_recall'], 'new_buy_recall': new['buy_recall'],
+            'old_sell_recall': old and old['sell_recall'], 'new_sell_recall': new['sell_recall'],
+            'old_nonhold_share': old and old['nonhold_share'], 'new_nonhold_share': new['nonhold_share'],
+            'class_weight': bool(a.class_weight and kind == 'lstm'),
             'holdout_rows': n_rows, 'holdout_start': str(split.date()),
+            **baseline(y_true_new),
         })
         if promote:
             dest = out / 'files'
@@ -193,6 +220,37 @@ def cmd_run(a):
         decision.update({'decision': 'error', 'reason': f'{type(e).__name__}: {e}'})
     (out / 'decision.json').write_text(json.dumps(decision, indent=2))
     print(json.dumps(decision, indent=2))
+
+
+def summary_table(rows):
+    """Markdown table for the CI job summary: how each model compares with the
+    always-predict-the-majority baseline, and whether it ever calls Buy/Sell."""
+    out = ['| sector | decision | current F1 | new F1 | always-Hold F1 | new Buy / Sell recall | new non-Hold share | reason |',
+           '|---|---|---|---|---|---|---|---|']
+    for r in rows:
+        out.append(f"| {r['sector']} | {r['decision']} | {r.get('old_macro_f1')} | {r.get('new_macro_f1')} | "
+                   f"{r.get('baseline_macro_f1')} | {r.get('new_buy_recall')} / {r.get('new_sell_recall')} | "
+                   f"{r.get('new_nonhold_share')} | {r['reason']} |")
+    return '\n'.join(out) + '\n'
+
+
+def load_decisions(artifacts):
+    seen = {}
+    for dj in sorted(Path(artifacts).rglob('decision.json')):
+        d = json.loads(dj.read_text())
+        seen[d['sector']] = d
+    return [seen.get(s) or {'sector': s, 'decision': 'no_result', 'reason': 'no output'}
+            for s in LSTM_SECTORS + XGB_SECTORS]
+
+
+def cmd_report(a):
+    """Print the comparison table for a set of `run` outputs. Writes nothing to the repo --
+    used by the class-weight experiment workflow, which must never change deployed models."""
+    table = summary_table(load_decisions(a.artifacts))
+    print(table)
+    if os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+            f.write(table)
 
 
 def cmd_publish(a):
@@ -221,10 +279,7 @@ def cmd_publish(a):
     Path(a.summary_file).write_text(summary + '\n')
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
-            f.write('| sector | decision | old F1 | new F1 | reason |\n|---|---|---|---|---|\n')
-            for r in rows:
-                f.write(f"| {r['sector']} | {r['decision']} | {r.get('old_macro_f1')} | "
-                        f"{r.get('new_macro_f1')} | {r['reason']} |\n")
+            f.write(summary_table(rows))
 
 
 if __name__ == '__main__':
@@ -240,7 +295,13 @@ if __name__ == '__main__':
     r.add_argument('--min-rows', type=int, default=100)
     r.add_argument('--tol-f1', type=float, default=0.01)
     r.add_argument('--tol-acc', type=float, default=0.02)
+    r.add_argument('--class-weight', action='store_true',
+                   help='train LSTMs with inverse-frequency class weights (experiment; ignored for XGBoost)')
     r.set_defaults(fn=cmd_run)
+
+    rp = sub.add_parser('report')
+    rp.add_argument('--artifacts', required=True)
+    rp.set_defaults(fn=cmd_report)
 
     p = sub.add_parser('publish')
     p.add_argument('--artifacts', required=True)

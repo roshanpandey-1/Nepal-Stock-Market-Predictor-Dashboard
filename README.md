@@ -20,7 +20,7 @@
 
 NEPSE Intelligence is an end-to-end machine learning pipeline built around Nepal's stock market: it scrapes daily price data and financial news, engineers technical indicators, trains a separate classifier per market sector, evaluates them on a true out-of-sample holdout, and serves the results through an interactive dashboard.
 
-The project covers **260 tickers across 8 sectors**, and deliberately reports its results honestly — including [a significant limitation](#-known-limitation-majority-class-collapse) in the current models that most portfolio projects would quietly omit.
+The project covers **270 tickers across 12 sectors**, and deliberately reports its results honestly — including [a significant limitation](#-known-limitation-majority-class-collapse) in the current models that most portfolio projects would quietly omit.
 
 ## ✨ Features
 
@@ -114,14 +114,28 @@ Buy/Sell/Hold classifiers, one per NEPSE sector, trained on a rolling 2-year win
 
 The accuracy column looks reasonable at a glance, but most of it comes from the model predicting **"Hold" for nearly every sample**. The label distribution is Hold-dominated, and without class weighting the model learns that always predicting Hold is the lowest-risk strategy.
 
-**6 of 8 sectors have near-zero Buy/Sell recall on the holdout set** — meaning they are not currently producing usable trading signals. Only Manufacturing & Processing, and to a lesser extent Development Banks, meaningfully use all three classes.
+**Most of the 12 sectors have near-zero Buy/Sell recall on the recent holdout** — they are not producing usable trading signals. On the deployed models, Tradings, Life Insurance and Non Life Insurance score exactly like an always-Hold predictor, and Commercial Banks, Microfinance and Finance are barely above it. Only Manufacturing & Processing and Development Banks meaningfully use all three classes. In the out-of-sample backtest, **11 of 12 sectors made zero trades**; several "beat buy-and-hold" only by staying in cash. Manufacturing (3 trades, +14.5% vs +13.4% buy-and-hold) is the only sector with real trading evidence.
 
 Two remediations were attempted and neither resolved it:
 
 - **Data-noise removal** — dropping short-history tickers and unadjusted bonus/rights-share price artifacts, using a NEPSE-rule-aware threshold (10% daily circuit limit before 20 Apr 2026, 15% after). Improved data quality, but moved holdout accuracy by **<1% in every sector**.
 - **Percentile-based labeling** — assigning Sell/Hold/Buy by the 30th/70th percentile of each ticker's forward return instead of a fixed ±1% threshold. Fixed the collapse in 4 of 8 sectors but lowered overall accuracy and left the other 4 collapsed, so it was reverted.
 
-The next approach worth trying is **class weighting in the training loss**, which targets the imbalance directly rather than through the labeling scheme. Not yet implemented.
+Every weekly retrain now reports the **always-Hold baseline** (accuracy and macro-F1) and per-class Buy/Sell recall next to each model, so a model that only matches the baseline is visible at a glance.
+
+**Class weighting in the training loss** is being evaluated next. On the four sectors that already have class-weighted models, it lifted macro-F1 for Investment (0.35 to 0.41), Others (0.32 to 0.39) and Tradings (0.28 to 0.36) and made Buy/Sell predictions appear, at the cost of accuracy; it hurt Hotels & Tourism. The manual **Class-weight experiment** workflow trains all 12 sectors this way and reports the comparison without changing any deployed model.
+
+## 🤖 Automation (GitHub Actions)
+
+| Workflow | Schedule | What it does |
+|---|---|---|
+| Refresh news sentiment | daily | Scrapes new headlines, scores them with FinBERT, commits `deploy_data/news` |
+| Refresh daily prices | Mon–Fri | Fetches new prices into the full-history snapshot (release `data-latest`) and refreshes `deploy_data/processed` |
+| Weekly forecasts and retraining | Saturday | Rebuilds Prophet forecasts; retrains each sector and promotes the new model only if it passes a quality gate |
+| Monthly backtest | 1st of month | Re-runs the out-of-sample backtest |
+| Class-weight experiment | manual | Compares class-weighted training against the deployed models; deploys nothing |
+
+Render redeploys automatically on every push.
 
 ## 📁 Project Structure
 
