@@ -546,3 +546,16 @@ a:hover { text-decoration: underline; }
   /* keep the header single-line on small screens */
   .nav-search { display: none; }
 }
+
+
+/* Headline pager (Sentiment page) */
+.pager { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 18px; }
+.pager a, .pager span {
+  min-width: 36px; padding: 6px 12px; text-align: center; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--card-bg); color: var(--text);
+  font-size: 0.9rem; text-decoration: none;
+}
+.pager a:hover { border-color: var(--accent); color: var(--accent); }
+.pager .current { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pager .disabled { color: var(--text-dim); opacity: 0.5; }
+.pager .gap { border-color: transparent; background: transparent; color: var(--text-dim); }

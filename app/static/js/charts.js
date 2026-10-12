@@ -494,7 +494,7 @@ function _layoutIndicesRow() {
   const turnoverPanel = document.getElementById("turnover-panel");
   if (!subCol) return;
   const turnoverVisible = turnoverPanel && turnoverPanel.style.display !== "none";
-  subCol.classList.toggle("col-md-8", turnoverVisible);
+  subCol.classList.toggle("col-md-7", turnoverVisible);
   subCol.classList.toggle("col-12", !turnoverVisible);
 }
 

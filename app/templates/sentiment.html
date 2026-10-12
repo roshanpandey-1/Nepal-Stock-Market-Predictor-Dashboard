@@ -11,8 +11,11 @@ scraping, so it isn't split out per ticker.</p>
   <canvas id="sentiment-chart" height="80"></canvas>
 </div>
 
-<div class="card-panel">
-  <h3>Recent Headlines</h3>
+<div class="card-panel" id="headlines">
+  <h3>Headlines</h3>
+  <p class="text-dim" style="margin-top:-4px;">
+    Newest first &middot; showing {{ first_shown }}&ndash;{{ last_shown }} of {{ total }}
+  </p>
   <table class="data-table">
     <thead>
       <tr><th>Date</th><th>Headline</th><th>Sentiment</th><th>Score</th></tr>
@@ -36,6 +39,30 @@ scraping, so it isn't split out per ticker.</p>
       {% endfor %}
     </tbody>
   </table>
+
+  {% if pages > 1 %}
+  <nav class="pager" aria-label="Headline pages">
+    {% if page > 1 %}
+      <a href="{{ url_for('main.sentiment', page=page-1) }}#headlines">&laquo; Newer</a>
+    {% else %}
+      <span class="disabled">&laquo; Newer</span>
+    {% endif %}
+    {% for n in page_numbers %}
+      {% if n is none %}
+        <span class="gap">&hellip;</span>
+      {% elif n == page %}
+        <span class="current" aria-current="page">{{ n }}</span>
+      {% else %}
+        <a href="{{ url_for('main.sentiment', page=n) }}#headlines">{{ n }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+      <a href="{{ url_for('main.sentiment', page=page+1) }}#headlines">Older &raquo;</a>
+    {% else %}
+      <span class="disabled">Older &raquo;</span>
+    {% endif %}
+  </nav>
+  {% endif %}
 </div>
 
 {% endblock %}

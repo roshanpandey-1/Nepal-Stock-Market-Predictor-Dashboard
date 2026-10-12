@@ -3,7 +3,11 @@ import json
 import os
 import time
 from pathlib import Path
-from flask import Blueprint, render_template, abort
+from flask import Blueprint, render_template, abort, request
+
+from . import news_utils
+
+HEADLINES_PER_PAGE = 25
 
 main = Blueprint("main", __name__)
 
@@ -180,7 +184,7 @@ def dashboard():
     sentiment_rows = _read_csv(NEWS_DIR / "daily_market_sentiment.csv")
     latest_sentiment = sentiment_rows[-1] if sentiment_rows else None
     headlines = _read_csv(NEWS_DIR / "news_sentiment.csv")
-    recent_headlines = list(reversed(headlines))[:6]
+    recent_headlines = news_utils.recent_headlines(headlines, 6)
     gainers, losers, _ = _get_cached_movers(limit=5)
     return render_template(
         "dashboard.html",
@@ -279,9 +283,20 @@ def stock_detail(ticker):
 @main.route("/sentiment")
 def sentiment():
     daily_rows = _read_csv(NEWS_DIR / "daily_market_sentiment.csv")
-    headlines = _read_csv(NEWS_DIR / "news_sentiment.csv")
-    headlines = list(reversed(headlines))[:25]
-    return render_template("sentiment.html", daily_rows=daily_rows, headlines=headlines)
+    all_headlines = news_utils.recent_headlines(_read_csv(NEWS_DIR / "news_sentiment.csv"))
+    total = len(all_headlines)
+    pages = max(1, -(-total // HEADLINES_PER_PAGE))  # ceil division
+    page = min(max(request.args.get("page", 1, type=int), 1), pages)
+    first = (page - 1) * HEADLINES_PER_PAGE
+    return render_template(
+        "sentiment.html",
+        daily_rows=daily_rows,
+        headlines=all_headlines[first:first + HEADLINES_PER_PAGE],
+        page=page, pages=pages, total=total,
+        first_shown=first + 1 if total else 0,
+        last_shown=min(first + HEADLINES_PER_PAGE, total),
+        page_numbers=news_utils.page_window(page, pages),
+    )
 
 
 @main.route("/backtest")

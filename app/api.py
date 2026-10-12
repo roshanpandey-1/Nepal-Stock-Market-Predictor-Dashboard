@@ -14,6 +14,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify
 
+from . import news_utils
+
 api = Blueprint("api", __name__)
 
 import os
@@ -242,7 +244,7 @@ def sentiment(ticker):
         "ticker": ticker,
         "scope": "market_wide",
         "daily_sentiment": daily[-30:],
-        "recent_headlines": list(reversed(headlines))[:10],
+        "recent_headlines": news_utils.recent_headlines(headlines, 10),
     })
 
 
