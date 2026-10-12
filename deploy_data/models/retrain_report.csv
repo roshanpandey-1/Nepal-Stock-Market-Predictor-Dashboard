@@ -1,13 +1,13 @@
 run_date,sector,model_type,decision,reason,old_accuracy,new_accuracy,old_macro_f1,new_macro_f1,holdout_rows,holdout_start
-2026-10-12,Hydro Power,lstm,kept_current,accuracy 0.503 < current 0.5332 - 0.02,0.5332,0.503,0.3583,0.3683,6386,2026-07-09
-2026-10-12,Microfinance,lstm,kept_current,accuracy 0.5613 < current 0.5854 - 0.02,0.5854,0.5613,0.2725,0.3179,3075,2026-07-09
-2026-10-12,Commercial Banks,lstm,kept_current,accuracy 0.6935 < current 0.7428 - 0.02,0.7428,0.6935,0.2893,0.3665,1178,2026-07-09
-2026-10-12,Development Banks,lstm,kept_current,macro-F1 0.408 < current 0.4263 - 0.01,0.5766,0.6109,0.4263,0.408,992,2026-07-09
-2026-10-12,Finance,lstm,kept_current,accuracy 0.483 < current 0.6141 - 0.02,0.6141,0.483,0.268,0.3342,824,2026-07-09
-2026-10-12,Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.7016,0.7005,0.2796,0.2746,868,2026-07-09
-2026-10-12,Non Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.5993,0.5993,0.2498,0.25,806,2026-07-09
-2026-10-12,Hotels And Tourism,lstm,kept_current,macro-F1 0.2869 < current 0.3084 - 0.01,0.5677,0.5758,0.3084,0.2869,495,2026-07-09
-2026-10-12,Investment,lstm,promoted,candidate not worse than current on the shared holdout,0.5991,0.6175,0.3464,0.3515,434,2026-07-09
-2026-10-12,Others,lstm,kept_current,accuracy 0.5269 < current 0.5538 - 0.02,0.5538,0.5269,0.3216,0.3642,558,2026-07-09
+2026-10-12,Hydro Power,lstm,kept_current,accuracy 0.5085 < current 0.5332 - 0.02,0.5332,0.5085,0.3583,0.3584,6386,2026-07-09
+2026-10-12,Microfinance,lstm,kept_current,accuracy 0.5593 < current 0.5854 - 0.02,0.5854,0.5593,0.2725,0.3152,3075,2026-07-09
+2026-10-12,Commercial Banks,lstm,kept_current,accuracy 0.6783 < current 0.7428 - 0.02,0.7428,0.6783,0.2893,0.3842,1178,2026-07-09
+2026-10-12,Development Banks,lstm,promoted,candidate not worse than current on the shared holdout,0.5766,0.625,0.4263,0.4376,992,2026-07-09
+2026-10-12,Finance,lstm,kept_current,accuracy 0.5158 < current 0.6141 - 0.02,0.6141,0.5158,0.268,0.3671,824,2026-07-09
+2026-10-12,Life Insurance,lstm,kept_current,accuracy 0.6567 < current 0.7005 - 0.02,0.7005,0.6567,0.2746,0.3201,868,2026-07-09
+2026-10-12,Non Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.5993,0.5993,0.25,0.2498,806,2026-07-09
+2026-10-12,Hotels And Tourism,lstm,kept_current,macro-F1 0.2949 < current 0.3084 - 0.01,0.5677,0.5778,0.3084,0.2949,495,2026-07-09
+2026-10-12,Investment,lstm,kept_current,accuracy 0.5714 < current 0.6175 - 0.02,0.6175,0.5714,0.3515,0.3666,434,2026-07-09
+2026-10-12,Others,lstm,kept_current,macro-F1 0.3019 < current 0.3216 - 0.01,0.5538,0.5627,0.3216,0.3019,558,2026-07-09
 2026-10-12,Tradings,lstm,promoted,candidate not worse than current on the shared holdout,0.7177,0.7177,0.2786,0.2786,124,2026-07-09
 2026-10-12,Manufacturing And Processing,xgb,kept_current,macro-F1 0.3776 < current 0.4049 - 0.01,0.4321,0.4852,0.4049,0.3776,810,2026-07-09
