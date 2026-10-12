@@ -211,7 +211,7 @@ def cmd_run(a):
             'holdout_rows': n_rows, 'holdout_start': str(split.date()),
             **baseline(y_true_new),
         })
-        if promote:
+        if promote or a.keep_files:
             dest = out / 'files'
             dest.mkdir(exist_ok=True)
             for f in model_files(sector, cand_dir):
@@ -297,6 +297,8 @@ if __name__ == '__main__':
     r.add_argument('--tol-acc', type=float, default=0.02)
     r.add_argument('--class-weight', action='store_true',
                    help='train LSTMs with inverse-frequency class weights (experiment; ignored for XGBoost)')
+    r.add_argument('--keep-files', action='store_true',
+                   help='save the candidate model files even when not promoted (for backtesting an experiment)')
     r.set_defaults(fn=cmd_run)
 
     rp = sub.add_parser('report')
