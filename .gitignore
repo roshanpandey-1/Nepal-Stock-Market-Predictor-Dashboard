@@ -39,3 +39,6 @@ data/models/
 # committed on purpose so the live dashboard has data to serve.
 !deploy_data/
 !deploy_data/**
+
+# Full price-history bundle (distributed via a GitHub release, not git)
+data-snapshot.tar.gz

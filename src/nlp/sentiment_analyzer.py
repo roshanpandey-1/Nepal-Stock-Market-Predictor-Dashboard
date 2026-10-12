@@ -16,9 +16,7 @@ os.environ["USE_TF"] = "0"
 import time
 import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from transformers import pipeline
 from loguru import logger
@@ -44,9 +42,10 @@ class NewsSentimentAnalyzer:
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        return webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()), options=options
-        )
+        # Selenium Manager (built into selenium >= 4.6) finds/downloads the
+        # matching chromedriver itself. webdriver-manager was dropped: on
+        # Windows it can return a non-executable path (WinError 193).
+        return webdriver.Chrome(options=options)
 
     def _scrape_page(self, driver, url):
         """Scrape one page of headlines, return (articles, next_page_url_or_None)."""
@@ -95,6 +94,9 @@ class NewsSentimentAnalyzer:
 
         driver.quit()
 
+        if not all_articles:
+            raise RuntimeError("Scraped 0 articles -- site blocked or layout changed")
+
         df = pd.DataFrame(all_articles)
         df = df.drop_duplicates(subset='url').reset_index(drop=True)
         logger.info(f"Scraped {len(df)} unique articles")
@@ -127,14 +129,36 @@ class NewsSentimentAnalyzer:
         ).reset_index()
         return daily
 
-    def run(self, max_pages: int = 50, output_dir: str = 'data/news') -> pd.DataFrame:
-        """Full pipeline: scrape -> score -> aggregate -> save. Returns daily sentiment df."""
-        os.makedirs(output_dir, exist_ok=True)
+    def run(self, max_pages: int = 50, output_dir: str = 'data/news',
+            merge: bool = True) -> pd.DataFrame:
+        """Full pipeline: scrape -> score NEW headlines -> aggregate -> save.
 
-        df = self.scrape_news(max_pages=max_pages)
-        df = self.score_sentiment(df)
-        df.to_csv(f'{output_dir}/news_sentiment.csv', index=False)
-        logger.info(f"Saved headline-level sentiment to {output_dir}/news_sentiment.csv")
+        With merge=True (default) headlines already in news_sentiment.csv are
+        kept and only unseen URLs are scored, so scheduled runs build up
+        history instead of overwriting it with the latest page of news.
+        Returns the daily sentiment df.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        sent_path = f'{output_dir}/news_sentiment.csv'
+
+        existing = None
+        if merge and os.path.exists(sent_path):
+            existing = pd.read_csv(sent_path)
+
+        fresh = self.scrape_news(max_pages=max_pages)
+        if existing is not None:
+            fresh = fresh[~fresh['url'].isin(existing['url'])]
+            logger.info(f"{len(fresh)} new headlines (of {len(existing)} already stored)")
+
+        if len(fresh):
+            fresh = self.score_sentiment(fresh)
+            df = pd.concat([fresh, existing], ignore_index=True) if existing is not None else fresh
+        else:
+            df = existing
+        df = df.drop_duplicates(subset='url').reset_index(drop=True)
+
+        df.to_csv(sent_path, index=False)
+        logger.info(f"Saved headline-level sentiment to {sent_path} ({len(df)} rows)")
 
         daily = self.build_daily_sentiment(df)
         daily.to_csv(f'{output_dir}/daily_market_sentiment.csv', index=False)
@@ -145,6 +169,14 @@ class NewsSentimentAnalyzer:
 
 # ── Test ─────────────────────────────────────────────────────
 if __name__ == '__main__':
+    import argparse
+    ap = argparse.ArgumentParser(description="Scrape + score NEPSE news sentiment")
+    ap.add_argument('--pages', type=int, default=50, help='max pages to scrape (default 50)')
+    ap.add_argument('--output-dir', default='data/news')
+    ap.add_argument('--fresh', action='store_true',
+                    help='ignore stored headlines and rebuild from this scrape only')
+    args = ap.parse_args()
     analyzer = NewsSentimentAnalyzer()
-    daily_sentiment = analyzer.run(max_pages=50)
-    print(daily_sentiment)
+    daily_sentiment = analyzer.run(max_pages=args.pages, output_dir=args.output_dir,
+                                   merge=not args.fresh)
+    print(daily_sentiment.tail(15))

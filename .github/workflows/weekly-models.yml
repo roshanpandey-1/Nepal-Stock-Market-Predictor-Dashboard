@@ -1,0 +1,130 @@
+name: Weekly forecasts and model retraining
+
+# Saturday 03:00 UTC = 08:45 Nepal (NEPSE trades Mon-Fri, so the market is closed
+# and Friday's prices are already in the data-latest bundle):
+#   1. rebuild Prophet price forecasts for every ticker
+#   2. retrain each sector model, ONE JOB PER SECTOR in parallel
+#   3. a retrained model replaces the deployed one only if it is not worse on the
+#      same recent holdout (examples/retrain_with_gate.py explains the rule)
+#   4. commit everything in one commit
+# The backtest summary is refreshed separately, once a month (monthly-backtest.yml).
+# A sector whose job fails or is rejected simply keeps its current model.
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-models
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      sectors: ${{ steps.plan.outputs.sectors }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - id: plan
+        run: |
+          pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 loguru >/dev/null
+          echo "sectors=$(python examples/retrain_with_gate.py plan)" >> "$GITHUB_OUTPUT"
+
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install prophet==1.1.5 plotly==5.18.0 pandas==2.1.3 numpy==1.26.2 loguru
+      - name: Download full price history
+        run: |
+          gh release download data-latest -p data-snapshot.tar.gz --clobber
+          python examples/data_snapshot.py unpack
+      - name: Build forecasts
+        run: |
+          mkdir -p out
+          python examples/build_forecasts.py --out out/forecast_summary.csv --daily-out out/forecast_daily.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forecasts
+          path: out/*.csv
+          if-no-files-found: error
+
+  train:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.plan.outputs.sectors) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies (CPU-only torch)
+        run: |
+          pip install torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 xgboost==2.0.2 loguru
+      - name: Download full price history
+        run: |
+          gh release download data-latest -p data-snapshot.tar.gz --clobber
+          python examples/data_snapshot.py unpack
+      - name: Train candidate, compare with current model
+        run: python examples/retrain_with_gate.py run --sector "${{ matrix.sector }}" --out-dir result
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-${{ matrix.stem }}
+          path: |
+            result/decision.json
+            result/files
+          if-no-files-found: ignore
+
+  publish:
+    needs: [forecast, train]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 loguru
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Merge promoted models and forecasts into deploy_data/models
+        run: |
+          [ -d artifacts/forecasts ] && cp artifacts/forecasts/*.csv deploy_data/models/ || echo "No new forecasts."
+          python examples/retrain_with_gate.py publish --artifacts artifacts --target deploy_data/models
+      - name: Commit and push if anything changed
+        run: |
+          if git diff --quiet -- deploy_data/models; then
+            echo "Nothing changed -- no commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy_data/models
+          git commit -m "chore(models): weekly forecasts + retrain" -m "$(cat retrain_summary.txt)"
+          git pull --rebase origin main
+          git push origin HEAD:main

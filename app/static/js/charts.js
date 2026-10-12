@@ -458,7 +458,10 @@ function renderLiveMarket(data) {
 
   let html = "";
 
-  if (data.index) {
+  // The indices strip already carries a NEPSE chip, so only show this big
+  // line as a fallback when the strip has nothing (avoids a duplicate).
+  const stripHasIndex = Array.isArray(data.all_indices) && data.all_indices.length > 0;
+  if (data.index && !stripHasIndex) {
     const cls = (data.index.change_pct ?? 0) >= 0 ? "pos" : "neg";
     const sign = (data.index.change_pct ?? 0) >= 0 ? "+" : "";
     const chg = data.index.change_pct == null

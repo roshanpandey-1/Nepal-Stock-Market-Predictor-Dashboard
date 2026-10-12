@@ -1,0 +1,61 @@
+name: Monthly backtest refresh
+
+# Re-runs the out-of-sample backtest for every sector with the models currently
+# in deploy_data/models and the latest prices, then updates the summary the
+# /backtest page shows. Monthly (not weekly) on purpose: the numbers only move
+# meaningfully when the holdout window or a model changes.
+on:
+  schedule:
+    - cron: "0 4 1 * *"   # 1st of each month, 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monthly-backtest
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies (CPU-only torch)
+        run: |
+          pip install torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 xgboost==2.0.2 loguru
+
+      - name: Download full price history
+        run: |
+          gh release download data-latest -p data-snapshot.tar.gz --clobber
+          python examples/data_snapshot.py unpack
+
+      - name: Run backtests with the deployed models
+        run: |
+          mkdir -p data/models
+          cp deploy_data/models/* data/models/
+          python examples/run_backtests_oos.py
+          cp data/models/backtest_summary_oos.csv deploy_data/models/
+
+      - name: Commit and push if anything changed
+        run: |
+          if git diff --quiet -- deploy_data/models/backtest_summary_oos.csv; then
+            echo "Backtest summary unchanged -- no commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy_data/models/backtest_summary_oos.csv
+          git commit -m "chore(backtest): monthly out-of-sample backtest refresh"
+          git pull --rebase origin main
+          git push origin HEAD:main

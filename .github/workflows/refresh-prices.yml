@@ -1,0 +1,71 @@
+name: Refresh daily prices
+
+# Pulls each ticker's new daily rows from Sharesansar, recomputes features, and
+# updates (a) the trimmed deploy_data/processed files the live site serves and
+# (b) the full-history bundle on the `data-latest` release that the weekly
+# forecast / retrain job reads.
+#
+# ONE-TIME SETUP: create a release tagged `data-latest` with data-snapshot.tar.gz
+# attached (made by `python examples/data_snapshot.py pack`). See that script.
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"   # Mon-Fri (NEPSE trading days), 10:30 UTC = 16:15 Nepal, after close
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-prices
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install selenium==4.15.0 beautifulsoup4 lxml pandas==2.1.3 numpy==1.26.2 ta==0.11.0 loguru
+
+      - name: Download full price history
+        run: |
+          gh release download data-latest -p data-snapshot.tar.gz --clobber
+          python examples/data_snapshot.py unpack
+
+      - name: Fetch new daily rows (Sharesansar)
+        run: python examples/fetch_incremental_data.py
+
+      # A blocked scrape looks like "no new rows", so fail loudly if the data
+      # is stale (limit allows for the long Dashain/Tihar market closures).
+      - name: Freshness check
+        run: python examples/data_snapshot.py check --max-age-days 12
+
+      - name: Rebuild trimmed deploy_data/processed
+        run: python examples/build_deploy_snapshot.py --only processed
+
+      - name: Upload updated full history
+        run: |
+          python examples/data_snapshot.py pack
+          gh release upload data-latest data-snapshot.tar.gz --clobber
+
+      - name: Commit and push if anything changed
+        run: |
+          if git diff --quiet -- deploy_data/processed; then
+            echo "No new prices -- nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy_data/processed
+          git commit -m "chore(data): refresh daily prices"
+          git pull --rebase origin main
+          git push origin HEAD:main

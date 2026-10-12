@@ -76,7 +76,13 @@ def build_news():
 
 
 if __name__ == "__main__":
-    build_processed()
-    build_models()
-    build_news()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", choices=["processed", "models", "news"],
+                    help="rebuild just one part (CI jobs refresh one part at a time)")
+    args = ap.parse_args()
+    steps = {"processed": build_processed, "models": build_models, "news": build_news}
+    for name, fn in steps.items():
+        if args.only in (None, name):
+            fn()
     print("Done. Review deploy_data/, then git add/commit/push it.")
