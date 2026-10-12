@@ -158,6 +158,12 @@ def main():
         if len(failed) > 20:
             logger.warning(f"  ... and {len(failed) - 20} more")
 
+    # Nothing produced is a failure, not a quiet success -- otherwise a scheduled
+    # run just fails later with a confusing "no files to upload" message.
+    if not results:
+        logger.error("No forecasts were produced (see the failures above).")
+        sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
