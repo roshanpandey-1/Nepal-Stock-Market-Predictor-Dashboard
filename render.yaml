@@ -22,3 +22,9 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
+      # Password-reset emails (Brevo, sent over HTTPS). MAIL_SENDER must be an
+      # address you verified in Brevo.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_SENDER
+        sync: false

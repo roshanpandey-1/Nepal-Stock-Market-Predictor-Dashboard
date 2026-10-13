@@ -694,3 +694,4 @@ table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: 
 .btn-link-sm { background: none; border: 0; padding: 2px 6px; font-size: .8rem; color: var(--accent); cursor: pointer; border-radius: 4px; }
 .btn-link-sm:hover { background: var(--row-hover); }
 #tx-ticker:not(:placeholder-shown) { text-transform: uppercase; }
+.forgot-link { margin: -4px 0 12px; font-size: .82rem; text-align: right; }

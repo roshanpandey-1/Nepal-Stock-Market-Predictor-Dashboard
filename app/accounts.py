@@ -22,6 +22,8 @@ from flask import (Blueprint, current_app, flash, g, jsonify, redirect,
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from . import mailer
 from .models import Holding, User, WatchlistItem, db
 from . import portfolio_utils as pu
 
@@ -244,6 +246,94 @@ def login():
 
 
 _DUMMY_HASH = generate_password_hash("not-a-real-password")
+
+
+# --- forgotten password -------------------------------------------------------------
+RESET_MAX_AGE = 3600          # reset links last one hour
+_RESET_REQS = {}
+_RESET_LIMIT = 3              # reset emails per address+IP per hour
+
+
+def _reset_serializer():
+    return URLSafeTimedSerializer(current_app.secret_key, salt="password-reset")
+
+
+def _reset_token(user):
+    # Includes a fingerprint of the current password hash, so the link stops
+    # working as soon as the password is changed (single use).
+    return _reset_serializer().dumps({"uid": user.id, "fp": (user.password_hash or "")[-12:]})
+
+
+def _user_from_reset_token(token):
+    try:
+        data = _reset_serializer().loads(token, max_age=RESET_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    user = db.session.get(User, data.get("uid"))
+    if user is None or data.get("fp") != (user.password_hash or "")[-12:]:
+        return None
+    return user
+
+
+def _reset_rate_limited(email):
+    key = _throttle_key(email)
+    now = time.time()
+    hits = [t for t in _RESET_REQS.get(key, []) if now - t < 3600]
+    limited = len(hits) >= _RESET_LIMIT
+    if not limited:
+        hits.append(now)
+    _RESET_REQS[key] = hits
+    return limited
+
+
+@acct.route("/forgot", methods=["GET", "POST"])
+def forgot_password():
+    if current_user():
+        return redirect(url_for("acct.profile"))
+    sent = False
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        if not EMAIL_RE.match(email):
+            flash("Enter the Gmail address you signed up with.", "error")
+        else:
+            sent = True   # same answer whether or not the account exists
+            user = User.query.filter_by(email=email).first()
+            if user and not _reset_rate_limited(email):
+                link = url_for("acct.reset_password", token=_reset_token(user), _external=True)
+                mailer.send_email(
+                    user.email, "Reset your NEPSE Intelligence password",
+                    f"Hi {user.display_name},\n\nUse this link to choose a new password (valid for 1 hour):\n{link}\n\n"
+                    "If you didn't ask for this, you can ignore this email; your password stays the same.",
+                    f'<p>Hi {user.display_name},</p><p><a href="{link}">Choose a new password</a> '
+                    "(the link is valid for 1 hour).</p><p>If you didn't ask for this, ignore this email; "
+                    "your password stays the same.</p>")
+    return render_template("forgot.html", sent=sent, mail_ready=mailer.mail_configured())
+
+
+@acct.route("/reset/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    user = _user_from_reset_token(token)
+    if user is None:
+        return render_template("account_message.html", title="Link expired",
+                               message="This password reset link is invalid or has expired. "
+                                       "Request a new one from the login page."), 400
+    errors = {}
+    if request.method == "POST":
+        pw = request.form.get("password") or ""
+        confirm = request.form.get("confirm") or ""
+        if password_problem(pw):
+            errors["password"] = password_problem(pw)
+        elif pw.lower() == user.email:
+            errors["password"] = "The password can't be the same as your email."
+        elif confirm != pw:
+            errors["confirm"] = "Passwords don't match."
+        if not errors:
+            user.password_hash = generate_password_hash(pw)
+            db.session.commit()
+            _clear_failures(user.email)
+            flash("Password updated. Log in with your new password.", "ok")
+            return redirect(url_for("acct.login"))
+    return render_template("reset.html", token=token, errors=errors)
 
 
 @acct.route("/logout", methods=["POST"])

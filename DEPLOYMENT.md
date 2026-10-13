@@ -92,3 +92,17 @@ warning: fine for development, but accounts would disappear on each deploy.
 
 Tables are created automatically on first start. Profit/loss is gross (brokerage, SEBON,
 DP charges and capital gains tax are not modelled).
+
+### Forgot-password emails (Brevo)
+
+The login page has a "Forgot password?" link that emails a one-hour, single-use reset link.
+Render's free tier blocks SMTP, so emails go through Brevo's HTTPS API (free, ~300 emails/day):
+
+1. Sign up at [brevo.com](https://www.brevo.com) and, under **Senders, Domains & Dedicated IPs → Senders**,
+   add and verify a sender email (your Gmail works; no domain needed).
+2. **SMTP & API → API keys** → generate a key.
+3. On Render set `BREVO_API_KEY` (the key) and `MAIL_SENDER` (the verified sender address);
+   optionally `MAIL_SENDER_NAME`.
+
+Without these the site still works, but no email is sent: the reset link is only written to the
+server log (handy when testing locally). Emails sent from a free Gmail sender can land in spam.

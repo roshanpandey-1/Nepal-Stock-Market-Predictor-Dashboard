@@ -225,3 +225,73 @@ def test_taken_email_is_flagged_with_free_suggestions(client):
 def test_google_button_is_always_visible(client):
     r = client.get("/register")
     assert b"Continue with Google" in r.data
+
+
+@pytest.fixture
+def outbox(monkeypatch):
+    sent = []
+    from app import accounts, mailer
+    accounts._RESET_REQS.clear()
+    monkeypatch.setattr(mailer, "send_email", lambda to, subject, text, html=None: sent.append((to, text)) or True)
+    return sent
+
+
+def _link(sent):
+    import re as _re
+    return _re.search(r"http://\S+/reset/\S+", sent[-1][1]).group(0).split("localhost")[-1]
+
+
+def test_forgot_password_sends_a_link_that_resets_once(client, outbox):
+    _signup(client)
+    client.post("/logout", data={"csrf_token": _token(client)})
+    r = client.post("/forgot", data={"email": "a@gmail.com", "csrf_token": _token(client)})
+    assert r.status_code == 200 and b"sent a link" in r.data and len(outbox) == 1
+    path = _link(outbox)
+    assert client.get(path).status_code == 200
+    bad = client.post(path, data={"password": "weakpass", "confirm": "weakpass", "csrf_token": _token(client)})
+    assert bad.status_code == 200 and b"capital letter" in bad.data
+    mism = client.post(path, data={"password": "Brand-new9!", "confirm": "Other-new9!", "csrf_token": _token(client)})
+    assert b"Passwords don&#39;t match" in mism.data
+    ok = client.post(path, data={"password": "Brand-new9!", "confirm": "Brand-new9!", "csrf_token": _token(client)})
+    assert ok.status_code == 302 and "/login" in ok.headers["Location"]
+    login = client.post("/login", data={"email": "a@gmail.com", "password": "Brand-new9!", "csrf_token": _token(client)})
+    assert login.status_code == 302
+    client.post("/logout", data={"csrf_token": _token(client)})
+    assert client.get(path).status_code == 400          # link is single-use
+    old = client.post("/login", data={"email": "a@gmail.com", "password": "Correct-horse1", "csrf_token": _token(client)})
+    assert old.status_code == 200
+
+
+def test_forgot_password_does_not_reveal_unknown_emails(client, outbox):
+    r = client.post("/forgot", data={"email": "nobody@gmail.com", "csrf_token": _token(client)})
+    assert r.status_code == 200 and b"sent a link" in r.data and outbox == []
+
+
+def test_forgot_password_is_rate_limited_and_bad_tokens_rejected(client, outbox):
+    _signup(client)
+    client.post("/logout", data={"csrf_token": _token(client)})
+    for _ in range(5):
+        client.post("/forgot", data={"email": "a@gmail.com", "csrf_token": _token(client)})
+    assert len(outbox) == 3
+    assert client.get("/reset/not-a-real-token").status_code == 400
+
+
+def test_mailer_posts_to_brevo_and_falls_back_to_logging(monkeypatch):
+    from app import mailer
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
+    assert mailer.send_email("x@gmail.com", "s", "t") is False        # not configured: logged only
+    monkeypatch.setenv("BREVO_API_KEY", "k"); monkeypatch.setenv("MAIL_SENDER", "me@gmail.com")
+    seen = {}
+
+    class R:
+        status_code = 201
+        text = ""
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        seen.update(url=url, json=json, headers=headers)
+        return R()
+
+    monkeypatch.setattr(mailer.requests, "post", fake_post)
+    assert mailer.send_email("x@gmail.com", "Hello", "body", "<p>body</p>") is True
+    assert seen["url"].endswith("/v3/smtp/email") and seen["headers"]["api-key"] == "k"
+    assert seen["json"]["to"] == [{"email": "x@gmail.com"}] and seen["json"]["sender"]["email"] == "me@gmail.com"

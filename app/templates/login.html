@@ -14,6 +14,7 @@
     <label class="field"><span>Password</span>
       <input type="password" name="password" required autocomplete="current-password">
     </label>
+    <p class="forgot-link"><a href="{{ url_for('acct.forgot_password') }}">Forgot password?</a></p>
     <button class="btn-primary-nepse" type="submit">Log in</button>
   </form>
   {% include "_google_button.html" %}
