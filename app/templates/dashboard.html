@@ -63,7 +63,7 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
       </div>
 
       <div id="live-chart-wrap" style="display:none;">
-        <canvas id="live-index-chart" height="110"></canvas>
+        <div class="chart-box"><canvas id="live-index-chart"></canvas></div>
       </div>
 
       <p class="text-dim mt-2" style="font-size:0.74rem; margin-bottom:0;">
@@ -136,7 +136,8 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
 
     <div class="card-panel">
       <h3>Sector Model Summary</h3>
-      <table class="data-table">
+      <div class="table-scroll">
+      <table class="data-table summary-table">
         <thead>
           <tr><th>Sector</th><th>Model</th><th>ML Return</th><th>Buy &amp; Hold</th><th>Sharpe</th></tr>
         </thead>
@@ -152,6 +153,7 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
           {% endfor %}
         </tbody>
       </table>
+      </div>
       <p class="text-dim mt-2" style="font-size:0.85rem;">Full backtest detail on the <a href="{{ url_for('main.backtest') }}">Backtest</a> page.</p>
     </div>
 

@@ -8,10 +8,11 @@
 from the same date, with 100,000 in simulated capital.</p>
 
 <div class="card-panel">
-  <canvas id="backtest-chart" height="90"></canvas>
+  <div class="chart-box tall"><canvas id="backtest-chart"></canvas></div>
 </div>
 
 <div class="card-panel">
+  <div class="table-scroll">
   <table class="data-table">
     <thead>
       <tr>
@@ -37,6 +38,7 @@ from the same date, with 100,000 in simulated capital.</p>
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 
 <div class="limitation-note">

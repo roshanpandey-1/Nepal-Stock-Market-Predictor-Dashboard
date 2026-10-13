@@ -54,6 +54,22 @@ Chart.defaults.font.family = "-apple-system, 'Segoe UI', Roboto, Helvetica, Aria
 // new Chart(...) picks up the new values. So each render*Chart function
 // below registers a "redraw with current data" closure here, and switching
 // themes replays whichever charts are currently on the page.
+// Phone-width check used to thin out axis labels so they stop overlapping.
+function _shortDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+  if (!m) return iso;
+  return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m[2] - 1] + " " + m[1].slice(2);
+}
+function _isPhone() { return window.matchMedia("(max-width: 640px)").matches; }
+// Crossing the phone/desktop breakpoint (rotating a phone, resizing a window)
+// rebuilds the charts so tick density and legend placement match the new width.
+try {
+  window.matchMedia("(max-width: 640px)").addEventListener("change", () => {
+    try { _redrawForTheme(); } catch (e) {}
+    try { _renderForecastChart(); } catch (e) {}
+  });
+} catch (e) {}
+
 const _themeRedraws = {};
 function _registerThemeRedraw(key, fn) { _themeRedraws[key] = fn; }
 
@@ -131,9 +147,10 @@ function renderBacktestChart(canvasId, rows) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { position: "top" } },
       scales: {
-        x: { ticks: { autoSkip: false, maxRotation: 30, minRotation: 30 } },
+        x: { ticks: { autoSkip: false, maxRotation: _isPhone() ? 60 : 30, minRotation: _isPhone() ? 60 : 30, font: { size: _isPhone() ? 10 : 12 } } },
         y: { title: { display: true, text: "Return (%)" } },
       },
     },
@@ -166,6 +183,7 @@ function renderSentimentChart(canvasId, dailyRows) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         y: {
@@ -268,6 +286,7 @@ function renderPriceChart(canvasId, history) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       layout: { padding: { right: 44 } },
       interaction: { mode: "index", intersect: false },
       plugins: {
@@ -287,8 +306,10 @@ function renderPriceChart(canvasId, history) {
         },
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 10 } },
-        y: { title: { display: true, text: "Price (NPR)" } },
+        x: { ticks: { maxTicksLimit: _isPhone() ? 4 : 10, maxRotation: 0,
+                      // "2026-03-25" -> "Mar 26" on phones so labels don't collide
+                      callback: function (v) { const l = this.getLabelForValue(v); return _isPhone() ? _shortDate(l) : l; } } },
+        y: { title: { display: !_isPhone(), text: "Price (NPR)" } },
       },
     },
     plugins: [crosshairPlugin],
@@ -836,6 +857,7 @@ function renderLiveIndexChart(rawSeries, indexInfo) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       animation: false,          // avoid a redraw flicker on each 60s poll
       interaction: { mode: "index", intersect: false },
       plugins: {
@@ -847,8 +869,8 @@ function renderLiveIndexChart(rawSeries, indexInfo) {
         },
       },
       scales: {
-        x: { ticks: { maxTicksLimit: 6, autoSkip: true } },
-        y: { position: "right", ticks: { maxTicksLimit: 6 } },
+        x: { ticks: { maxTicksLimit: _isPhone() ? 4 : 6, autoSkip: true, maxRotation: 0 } },
+        y: { position: "right", ticks: { maxTicksLimit: _isPhone() ? 5 : 6 } },
       },
     },
     plugins: [crosshairPlugin],
@@ -957,7 +979,7 @@ function renderSubIndices(rows) {
       const cls = up ? "pos" : "neg";
       const sign = up ? "+" : "";
       const pct = r.change_pct == null ? "—" : `${sign}${r.change_pct}%`;
-      const pts = r.change == null ? "" : ` <span class="text-dim">(${sign}${r.change})</span>`;
+      const pts = r.change == null ? "" : ` <span class="text-dim pts">(${sign}${r.change})</span>`;
       const dot = r.model_sector
         ? `<span class="model-dot" title="Modeled sector: ${r.model_sector}"></span>`
         : "";
@@ -1112,7 +1134,8 @@ let _forecastDays = null;      // [{date, forecast_price, lower_bound, upper_bou
 function _forecastPlotlyLayout() {
   const c = CHART_COLORS;
   const dark = _isDarkTheme();
-  return {
+  const phone = _isPhone();
+  const layout = {
     title: { text: "", font: { color: c.text } },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
@@ -1131,7 +1154,7 @@ function _forecastPlotlyLayout() {
       rangeselector: {
         x: 0, xanchor: "left", y: 1.12, yanchor: "bottom",
         bgcolor: dark ? "#1a1a1a" : "#f0f2f5",
-        activecolor: c.accent,
+        activecolor: dark ? "#3b4a63" : "#c7d7f5",
         font: { color: c.text },
         buttons: [
           { count: 7, label: "1W", step: "day", stepmode: "backward" },
@@ -1144,6 +1167,32 @@ function _forecastPlotlyLayout() {
     },
     yaxis: { title: "Price (Rs.)", gridcolor: c.grid, zerolinecolor: c.grid, color: c.text },
   };
+  if (phone) {
+    // Narrow screens: legend moves under the chart, margins shrink, axis
+    // labels stay horizontal and sparse, and the range buttons get smaller.
+    layout.height = 400;
+    layout.margin = { l: 44, r: 10, t: 40, b: 10 };
+    layout.font.size = 11;
+    layout.legend = { orientation: "h", x: 0, xanchor: "left", y: -0.1, yanchor: "top", font: { color: c.text, size: 11 } };
+    layout.xaxis.nticks = 4;
+    layout.xaxis.tickangle = 0;
+    layout.xaxis.tickformat = "%b %y";
+    layout.xaxis.rangeslider.visible = false;
+    layout.xaxis.rangeselector.y = 1.04;
+    layout.xaxis.rangeselector.font = { color: c.text, size: 11 };
+    layout.yaxis.title = "";
+    layout.yaxis.nticks = 5;
+    // Open zoomed on the last ~3 months + the forecast, so the 30-day
+    // window isn't a thin sliver at the right edge of a narrow screen.
+    const hist = _forecastHistory || [], days = _forecastDays || [];
+    if (hist.length > 60 && days.length) {
+      layout.xaxis.range = [hist[hist.length - 60].date, days[days.length - 1].date];
+      layout.xaxis.rangeselector.buttons.forEach(b => { b.active = false; });
+    }
+  } else {
+    layout.height = 460;
+  }
+  return layout;
 }
 
 function _forecastPlotlyTraces() {
@@ -1161,7 +1210,7 @@ function _forecastPlotlyTraces() {
     {
       x: days.map(d => d.date), y: days.map(d => d.forecast_price),
       name: "Forecast", mode: "lines",
-      line: { color: c.red, width: 2, dash: "dash" },
+      line: { color: c.red, width: 2 },
       hovertemplate: "<b>%{x}</b><br>Forecast: Rs. %{y:.1f}<extra></extra>",
     },
     {
@@ -1184,6 +1233,7 @@ function _renderForecastChart() {
   if (!el || typeof Plotly === "undefined") return;
   Plotly.react(el, _forecastPlotlyTraces(), _forecastPlotlyLayout(), {
     responsive: true,
+    displayModeBar: !_isPhone(),
     displaylogo: false,
     // Drop the camera/download-image button and the box-zoom drag-mode
     // tool -- the +/- buttons already next to them cover zooming.

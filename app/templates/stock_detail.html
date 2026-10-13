@@ -91,7 +91,7 @@
     <button data-days="180" class="active">6M</button>
     <button data-days="0">ALL</button>
   </div>
-  <canvas id="price-chart" height="90"></canvas>
+  <div class="chart-box"><canvas id="price-chart"></canvas></div>
   <p class="text-dim" style="font-size:0.75rem; margin-top:6px;">
     Our data is end-of-day only (one close per trading day), so 1D/1W show the last few daily closes rather than intraday movement.
   </p>
@@ -119,7 +119,7 @@
       <div class="stat-tile sm"><div class="label">Upper Bound</div><div class="value" id="forecast-upper">—</div></div>
     </div>
   </div>
-  <div id="forecast-chart" style="width:100%; min-height:460px;"></div>
+  <div id="forecast-chart" class="forecast-chart"></div>
   <p class="text-dim" style="font-size:0.75rem; margin-top:8px;" id="forecast-meta"></p>
 </div>
 {% endif %}

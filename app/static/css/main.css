@@ -552,9 +552,11 @@ button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-of
   white-space: nowrap;
 }
 
-@media (max-width: 991px) {
-  /* keep the header single-line on small screens */
-  .nav-search { display: none; }
+@media (max-width: 991.98px) {
+  /* small screens: search gets its own full-width row under the brand */
+  .nav-search { order: 4; width: 100%; margin-left: 0; }
+  .nav-search input { width: 100%; font-size: 16px; padding: 9px 14px; } /* 16px stops iOS zooming in */
+  .nav-search-results { width: 100%; max-height: 60vh; }
 }
 
 
@@ -695,3 +697,57 @@ table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: 
 .btn-link-sm:hover { background: var(--row-hover); }
 #tx-ticker:not(:placeholder-shown) { text-transform: uppercase; }
 .forgot-link { margin: -4px 0 12px; font-size: .82rem; text-align: right; }
+
+/* ===== Responsive: chart boxes, tables, phone spacing ===== */
+.chart-box { position: relative; width: 100%; height: 300px; }
+.chart-box.tall { height: 380px; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll table { min-width: 100%; }
+#sector-chart { max-height: 240px; }
+
+@media (max-width: 640px) {
+  .container-main { padding: 14px 14px 48px; }
+  h1 { font-size: 1.55rem; }
+  .card-panel { padding: 14px 14px; margin-bottom: 14px; border-radius: 10px; }
+  .card-panel:hover { box-shadow: 0 1px 2px var(--shadow); }
+  .card-panel h3 { font-size: 0.8rem; margin-bottom: 10px; padding-bottom: 8px; }
+  .limitation-note { font-size: 0.8rem; padding: 10px 12px; line-height: 1.5; }
+
+  /* stat tiles: tighter value text so long sector names don't tower */
+  .stat-tile { padding: 10px 12px; }
+  .stat-tile .value { font-size: 1.25rem; }
+  .stat-tile .value[style] { font-size: 1rem !important; line-height: 1.25; }
+
+  /* taller, readable charts */
+  .chart-box { height: 260px; }
+  .chart-box.tall { height: 320px; }
+
+  /* Advancing / Declining / Unchanged stay on one row */
+  .breadth-row { flex-wrap: nowrap; gap: 8px; }
+  .breadth-pill { min-width: 0; padding: 9px 4px; font-size: 0.74rem; }
+  .breadth-pill .n { font-size: 1.15rem; }
+
+  /* index chips: two per row instead of a ragged stack */
+  .indices-strip { gap: 8px; }
+  .index-chip { flex: 1 1 calc(50% - 8px); justify-content: space-between; padding: 6px 10px; font-size: 0.78rem; }
+
+  /* roomier, easier-to-tap table rows */
+  table.data-table { font-size: 0.82rem; }
+  table.data-table th, table.data-table td { padding: 10px 6px; }
+  table.data-table th { font-size: 0.66rem; }
+  table.data-table td .pts { display: block; font-size: 0.72rem; font-weight: 400; }
+  table.summary-table th, table.summary-table td { padding: 9px 5px; }
+
+  .news-item { padding: 12px 0; }
+  .news-item .headline { font-size: 0.9rem; line-height: 1.4; }
+  .live-badge { font-size: 0.6rem; padding: 2px 7px; }
+  .period-toggle { flex-wrap: wrap; }
+  .quote-price .ltp { font-size: 1.7rem; }
+}
+
+.forecast-chart { width: 100%; min-height: 460px; }
+@media (max-width: 640px) {
+  .forecast-chart { min-height: 400px; }
+  .quote-header h1 { font-size: 1.7rem; }
+  .stat-tile.sm .value { font-size: 1.05rem; }
+}
