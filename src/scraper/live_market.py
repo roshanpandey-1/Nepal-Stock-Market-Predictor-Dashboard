@@ -495,6 +495,41 @@ def _live_breadth(rows):
             "total": adv + dec + unc}
 
 
+BREADTH_BUCKETS = ("advancing", "declining", "unchanged")
+
+
+def _breadth_symbols(rows):
+    """Symbols behind each breadth count, using exactly the rule _live_breadth
+    uses, so a list's length always matches the number on its pill."""
+    out = {b: [] for b in BREADTH_BUCKETS}
+    if not isinstance(rows, list):
+        return out
+    seen = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        pct = _num(_pick(row, "percentageChange", "perChange"))
+        symbol = _pick(row, "symbol", "securitySymbol")
+        if pct is None or not symbol:
+            continue
+        symbol = str(symbol).strip().upper()
+        if symbol in seen:
+            continue
+        seen.add(symbol)
+        bucket = "advancing" if pct > 0 else "declining" if pct < 0 else "unchanged"
+        out[bucket].append(symbol)
+    return out
+
+
+def _sort_breadth_rows(bucket, rows):
+    """Biggest movers first; unchanged scrips by traded volume."""
+    if bucket == "advancing":
+        return sorted(rows, key=lambda q: -(q.get("change_pct") or 0))
+    if bucket == "declining":
+        return sorted(rows, key=lambda q: (q.get("change_pct") or 0))
+    return sorted(rows, key=lambda q: -(q.get("volume") or 0))
+
+
 def _normalise_index(payload):
     """NEPSE index -- the endpoint returns either a list of indices or a single dict."""
     row = None
@@ -598,6 +633,7 @@ def fetch_live_snapshot():
         "all_indices": [],
         "top_turnover": [],
         "_quotes": {},
+        "_breadth_quotes": {},
     }
 
     if _circuit_open():
@@ -653,6 +689,12 @@ def fetch_live_snapshot():
                 if q.get(field) is None:
                     q[field] = extra.get(field)
     snapshot["_quotes"] = quotes
+    # The full quote rows behind each breadth pill (same source as the counts).
+    buckets = _breadth_symbols(live if _live_breadth(live) else price_volume)
+    snapshot["_breadth_quotes"] = {
+        b: _sort_breadth_rows(b, [quotes[sym] for sym in syms if sym in quotes])
+        for b, syms in buckets.items()
+    }
 
     snapshot["index_history"] = _normalise_index_history(history)
     snapshot["subindices"] = _normalise_subindices(subindices)
@@ -750,3 +792,23 @@ def get_live_quote(ticker):
     result["market_open"] = snapshot.get("market_open")
     result["stale"] = snapshot.get("stale", False)
     return result
+
+
+def get_breadth_list(bucket):
+    """Every scrip behind one breadth pill ("advancing" / "declining" /
+    "unchanged"), with its full live quote. Read from the same cached snapshot
+    as the dashboard, so it costs no extra NEPSE call. Returns None for an
+    unknown bucket."""
+    if bucket not in BREADTH_BUCKETS:
+        return None
+    snapshot = get_live_snapshot()
+    rows = (snapshot.get("_breadth_quotes") or {}).get(bucket, []) if snapshot.get("available") else []
+    return {
+        "available": bool(snapshot.get("available")),
+        "bucket": bucket,
+        "market_open": snapshot.get("market_open"),
+        "stale": snapshot.get("stale", False),
+        "fetched_at": snapshot.get("fetched_at"),
+        "count": len(rows),
+        "rows": rows,
+    }

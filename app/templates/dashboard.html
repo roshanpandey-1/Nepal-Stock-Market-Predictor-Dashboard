@@ -178,6 +178,21 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
   </div>
 </div>
 
+<div class="modal fade" id="breadth-modal" tabindex="-1" aria-labelledby="breadth-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content breadth-modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="breadth-modal-title">Advancing</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="breadth-modal-body" class="table-responsive"></div>
+        <nav id="breadth-modal-pager" class="pager" aria-label="Pages"></nav>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 {% block scripts %}
 <script>

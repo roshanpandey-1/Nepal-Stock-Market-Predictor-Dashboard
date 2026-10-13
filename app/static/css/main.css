@@ -355,6 +355,17 @@ a:hover { text-decoration: underline; }
 .breadth-pill.dec .n { color: var(--red); }
 .breadth-pill.unc { background: var(--neutral-bg); }
 .breadth-pill.unc .n { color: var(--text-dim); }
+/* Pills are buttons: they open the list behind the number */
+button.breadth-pill { font: inherit; color: var(--text); cursor: pointer; transition: transform .08s, box-shadow .08s; }
+button.breadth-pill:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Advancing / Declining / Unchanged pop-up */
+.breadth-modal-content { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); }
+.breadth-modal-content .modal-header { border-bottom: 1px solid var(--border); }
+.breadth-modal-content .modal-title { font-weight: 600; }
+[data-theme="dark"] .breadth-modal-content .btn-close { filter: invert(1); }
+.breadth-table th, .breadth-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .breadth-pill { border: 1px solid var(--border); }
 
 /* --- News list (ShareHub "Recent News" style) --- */

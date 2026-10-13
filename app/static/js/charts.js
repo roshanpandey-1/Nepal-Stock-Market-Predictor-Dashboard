@@ -366,11 +366,140 @@ const LIVE_POLL_MS = 60000;
 
 function _liveBreadth(b) {
   if (!b) return "";
+  // Each pill opens a pop-up listing the scrips behind its number.
+  const pill = (cls, bucket, n, label) =>
+    `<button type="button" class="breadth-pill ${cls}" data-bucket="${bucket}"
+       title="Show the ${label.toLowerCase()} list"><span class="n">${n}</span>${label}</button>`;
   return `<div class="breadth-row mt-2">
-    <div class="breadth-pill adv"><span class="n">${b.advancing}</span>Advancing</div>
-    <div class="breadth-pill dec"><span class="n">${b.declining}</span>Declining</div>
-    <div class="breadth-pill unc"><span class="n">${b.unchanged}</span>Unchanged</div>
+    ${pill("adv", "advancing", b.advancing, "Advancing")}
+    ${pill("dec", "declining", b.declining, "Declining")}
+    ${pill("unc", "unchanged", b.unchanged, "Unchanged")}
   </div>`;
+}
+
+// --- Breadth pop-up (Advancing / Declining / Unchanged lists) ----------------
+const BREADTH_PAGE_SIZE = 10;
+const _breadthState = { bucket: null, rows: [], page: 1 };
+const _BREADTH_TITLES = { advancing: "Advancing", declining: "Declining", unchanged: "Unchanged" };
+
+// NEPSE-style short units: K = thousand, L = lakh, Cr = crore.
+function _shortNum(v) {
+  if (v == null || isNaN(v)) return "—";
+  const a = Math.abs(v);
+  const f = (x) => String(+x.toFixed(2));
+  if (a >= 1e7) return `${f(v / 1e7)} Cr`;
+  if (a >= 1e5) return `${f(v / 1e5)} L`;
+  if (a >= 1e3) return `${f(v / 1e3)} K`;
+  return f(v);
+}
+const _px = (v) => (v == null || isNaN(v) ? "—" : Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+
+function _breadthPageWindow(page, pages, around = 2) {
+  const out = [];
+  for (let n = 1; n <= pages; n++) {
+    if (n === 1 || n === pages || Math.abs(n - page) <= around) out.push(n);
+    else if (out[out.length - 1] !== null) out.push(null);
+  }
+  return out;
+}
+
+function _renderBreadthModal() {
+  const { bucket, rows, page } = _breadthState;
+  const body = document.getElementById("breadth-modal-body");
+  const pager = document.getElementById("breadth-modal-pager");
+  if (!body || !pager) return;
+  const pages = Math.max(1, Math.ceil(rows.length / BREADTH_PAGE_SIZE));
+  const slice = rows.slice((page - 1) * BREADTH_PAGE_SIZE, page * BREADTH_PAGE_SIZE);
+
+  if (!rows.length) {
+    body.innerHTML = `<p class="text-dim mb-0">No ${bucket} scrips to show right now.</p>`;
+    pager.innerHTML = "";
+    return;
+  }
+  body.innerHTML = `<table class="data-table breadth-table">
+    <thead><tr>
+      <th>Symbol</th><th>LTP</th><th>CH</th><th>CH %</th><th>Open</th><th>High</th>
+      <th>Low</th><th>Vol.</th><th>Turnover</th><th>Pr. Close</th>
+    </tr></thead>
+    <tbody>${slice.map(r => {
+      const cp = r.change_pct;
+      const cls = cp == null || cp === 0 ? "" : cp > 0 ? "pos" : "neg";
+      const sign = cp > 0 ? "+" : "";
+      const ch = r.change == null ? "—" : `${r.change > 0 ? "+" : ""}${_px(r.change)}`;
+      const title = r.name ? ` title="${String(r.name).replace(/"/g, "&quot;")}"` : "";
+      return `<tr>
+        <td${title}><a href="/stock/${encodeURIComponent(r.ticker)}">${r.ticker}</a></td>
+        <td>${_px(r.ltp)}</td>
+        <td class="${cls}">${ch}</td>
+        <td class="${cls}">${cp == null ? "—" : `${sign}${cp}%`}</td>
+        <td>${_px(r.open)}</td><td>${_px(r.high)}</td><td>${_px(r.low)}</td>
+        <td>${_shortNum(r.volume)}</td><td>${_shortNum(r.turnover)}</td>
+        <td>${_px(r.prev_close)}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+
+  const link = (label, n, disabled) => disabled
+    ? `<span class="disabled">${label}</span>`
+    : `<a href="#" data-page="${n}">${label}</a>`;
+  pager.innerHTML = pages <= 1 ? "" :
+    link("‹ Previous", page - 1, page <= 1) +
+    _breadthPageWindow(page, pages).map(n =>
+      n === null ? `<span class="gap">…</span>`
+        : n === page ? `<span class="current">${n}</span>`
+        : `<a href="#" data-page="${n}">${n}</a>`).join("") +
+    link("Next ›", page + 1, page >= pages);
+}
+
+async function openBreadthModal(bucket) {
+  const modalEl = document.getElementById("breadth-modal");
+  if (!modalEl || !window.bootstrap) return;
+  _breadthState.bucket = bucket;
+  _breadthState.rows = [];
+  _breadthState.page = 1;
+  document.getElementById("breadth-modal-title").textContent = _BREADTH_TITLES[bucket] || bucket;
+  document.getElementById("breadth-modal-body").innerHTML = `<p class="text-dim mb-0">Loading…</p>`;
+  document.getElementById("breadth-modal-pager").innerHTML = "";
+  bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  try {
+    const res = await fetch(`/api/live/breadth/${encodeURIComponent(bucket)}`);
+    const data = await res.json();
+    if (!data.available) {
+      document.getElementById("breadth-modal-body").innerHTML =
+        `<p class="text-dim mb-0">${data.reason || "Live data is unavailable right now."}</p>`;
+      return;
+    }
+    _breadthState.rows = data.rows || [];
+    const t = document.getElementById("breadth-modal-title");
+    t.textContent = `${_BREADTH_TITLES[bucket] || bucket} (${_breadthState.rows.length})`;
+    _renderBreadthModal();
+  } catch (e) {
+    document.getElementById("breadth-modal-body").innerHTML =
+      `<p class="text-dim mb-0">Could not load the list. Try again in a moment.</p>`;
+  }
+}
+
+function _initBreadthModal() {
+  const live = document.getElementById("live-body");
+  if (live) {
+    live.addEventListener("click", (e) => {
+      const pill = e.target.closest(".breadth-pill[data-bucket]");
+      if (pill) openBreadthModal(pill.dataset.bucket);
+    });
+  }
+  const pager = document.getElementById("breadth-modal-pager");
+  if (pager) {
+    pager.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-page]");
+      if (!a) return;
+      e.preventDefault();
+      _breadthState.page = parseInt(a.dataset.page, 10) || 1;
+      _renderBreadthModal();
+      // re-rendering drops the clicked link; keep focus inside the dialog so Esc still closes it
+      const modalEl = document.getElementById("breadth-modal");
+      if (modalEl) modalEl.focus();
+    });
+  }
 }
 
 function _renderIndicesStrip(rows) {
@@ -628,6 +757,7 @@ async function loadLiveMarket() {
 
 function initLiveMarket() {
   if (!document.getElementById("live-panel")) return;
+  _initBreadthModal();
   loadLiveMarket();
   setInterval(loadLiveMarket, LIVE_POLL_MS);
 }

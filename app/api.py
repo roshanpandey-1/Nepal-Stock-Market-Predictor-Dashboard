@@ -295,6 +295,7 @@ def live_market():
         # per-ticker lookup is server-side only; all ~333 rows would bloat
         # every 60s poll for data the dashboard doesn't display
         snapshot.pop("_quotes", None)
+        snapshot.pop("_breadth_quotes", None)
         return jsonify(snapshot)
     except Exception as exc:  # import error, unexpected bug -- never 500 the page
         return jsonify({
@@ -306,6 +307,24 @@ def live_market():
             "losers": [],
             "stale": False,
         })
+
+
+@api.route("/live/breadth/<bucket>")
+def live_breadth_list(bucket):
+    """Every scrip behind the Advancing / Declining / Unchanged pills, with its
+    full quote, for the dashboard's pop-up table. Same cached snapshot as
+    /api/live, so no extra NEPSE call. Always 200 with an `available` flag."""
+    bucket = (bucket or "").strip().lower()
+    try:
+        from src.scraper.live_market import get_breadth_list
+        result = get_breadth_list(bucket)
+        if result is None:
+            return jsonify({"available": False, "bucket": bucket,
+                            "reason": "unknown bucket", "rows": [], "count": 0}), 404
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"available": False, "bucket": bucket, "rows": [], "count": 0,
+                        "reason": f"Live data unavailable ({type(exc).__name__})"})
 
 
 @api.route("/live/quote/<ticker>")
