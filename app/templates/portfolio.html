@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Portfolio · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+  <h1 class="page-title mb-0">My Portfolio</h1>
+  <button class="btn-primary-nepse sm" type="button" id="open-tx-modal">+ Add holding</button>
+</div>
+<p class="text-dim">Add the scrips you own and how many shares you hold; they are valued at live NEPSE prices.</p>
+
+<div class="row g-2 mb-3" id="pf-tiles">
+  <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Value at LTP</div><div class="value" id="pf-value">—</div></div></div>
+  <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Today's change</div><div class="value" id="pf-day">—</div></div></div>
+  <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Scrips held</div><div class="value" id="pf-count">—</div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-8">
+    <div class="card-panel h-100">
+      <h3>Holdings <span class="src-badge" id="pf-source">—</span></h3>
+      <div class="table-responsive" id="holdings-wrap"><span class="text-dim">Loading…</span></div>
+      <p class="text-dim mt-2 mb-0" style="font-size:0.74rem;">
+        Last closing price is the previous session's close while the market is open; once it closes, LTP and last close are the same.
+        Use <strong>Edit</strong> to change a quantity.
+      </p>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card-panel h-100">
+      <h3>By sector</h3>
+      <div style="position:relative; max-width:240px; margin:0 auto;"><canvas id="sector-chart" height="220"></canvas></div>
+      <div id="sector-legend" class="mt-3"></div>
+    </div>
+  </div>
+</div>
+
+<div class="limitation-note">
+  Signals are shown for reference only. They come from sector out-of-sample models that mostly lean toward "Hold" on unseen data
+  (see <a href="{{ url_for('main.backtest') }}">Backtest</a>), and are not trading advice.
+</div>
+
+<div class="modal fade" id="tx-modal" tabindex="-1" aria-labelledby="tx-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content breadth-modal-content">
+      <form id="tx-form" novalidate autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title" id="tx-modal-title">Add holding</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="field"><span>Symbol</span>
+            <input type="text" name="ticker" id="tx-ticker" list="ticker-options" maxlength="15" required placeholder="Search a symbol, e.g. NABIL">
+          </label>
+          <datalist id="ticker-options"></datalist>
+          <label class="field"><span>Quantity <em>(shares you own)</em></span>
+            <input type="number" name="quantity" min="1" step="1" required inputmode="numeric">
+          </label>
+          <p class="text-dim" style="font-size:.76rem;margin:0 0 6px;">If you already hold this symbol, the quantity replaces the old one.</p>
+          <div class="form-msg" id="tx-msg" role="alert"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-ghost-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-primary-nepse sm" id="tx-submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>initPortfolioPage();</script>
+{% endblock %}

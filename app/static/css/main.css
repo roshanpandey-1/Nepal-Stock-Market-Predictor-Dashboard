@@ -178,11 +178,10 @@ a.ticker-item:hover .sym { text-decoration: underline; }
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.86rem;
   white-space: nowrap;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  margin: 0 !important; /* override the .mx-auto utility now that this is absolutely centered */
+  /* In normal flow (not absolutely centred) so it can never overlap the nav links
+     when the right-hand group grows, e.g. after login. */
+  flex-shrink: 0;
+  margin: 0 16px 0 auto !important;
 }
 .nav-index-dot {
   width: 8px;
@@ -355,6 +354,7 @@ a:hover { text-decoration: underline; }
 .breadth-pill.dec .n { color: var(--red); }
 .breadth-pill.unc { background: var(--neutral-bg); }
 .breadth-pill.unc .n { color: var(--text-dim); }
+.breadth-pill { border: 1px solid var(--border); }
 /* Pills are buttons: they open the list behind the number */
 button.breadth-pill { font: inherit; color: var(--text); cursor: pointer; transition: transform .08s, box-shadow .08s; }
 button.breadth-pill:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.12); }
@@ -366,7 +366,6 @@ button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-of
 .breadth-modal-content .modal-title { font-weight: 600; }
 [data-theme="dark"] .breadth-modal-content .btn-close { filter: invert(1); }
 .breadth-table th, .breadth-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.breadth-pill { border: 1px solid var(--border); }
 
 /* --- News list (ShareHub "Recent News" style) --- */
 .news-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -570,3 +569,128 @@ button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-of
 .pager .current { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .pager .disabled { color: var(--text-dim); opacity: 0.5; }
 .pager .gap { border-color: transparent; background: transparent; color: var(--text-dim); }
+
+/* ===== Accounts: auth pages, watchlist, portfolio ===== */
+.auth-card {
+  max-width: 420px; margin: 28px auto 0; padding: 26px 26px 22px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+.auth-card h1 { font-size: 1.5rem; margin-bottom: 4px; }
+.auth-alt { margin: 16px 0 0; text-align: center; font-size: 0.88rem; color: var(--text-dim); }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; color: var(--text-dim); font-size: 0.78rem; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.field { display: block; margin-bottom: 12px; }
+.field > span { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim); margin-bottom: 4px; }
+.field > span em { font-weight: 400; font-style: normal; opacity: .8; }
+.field input, .add-row input {
+  width: 100%; padding: 8px 11px; font-size: 0.92rem; color: var(--text);
+  background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
+}
+.field input:focus, .add-row input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+.btn-primary-nepse, .btn-danger-nepse, .btn-ghost-sm, .btn-google, .btn-signup {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-weight: 600; font-size: 0.9rem; border-radius: 6px; cursor: pointer;
+  padding: 9px 16px; text-decoration: none !important; border: 1px solid transparent;
+}
+.btn-primary-nepse { width: 100%; background: var(--accent); color: #fff; }
+.btn-primary-nepse:hover { filter: brightness(1.08); }
+.btn-primary-nepse.sm { width: auto; padding: 7px 14px; font-size: 0.84rem; }
+.btn-primary-nepse:disabled { opacity: .6; cursor: default; }
+.btn-danger-nepse { background: transparent; color: var(--red); border-color: var(--red); }
+.btn-danger-nepse:hover { background: rgba(220,38,38,.1); }
+.btn-ghost-sm { background: transparent; color: var(--text); border-color: var(--border); padding: 5px 12px; font-size: 0.8rem; }
+.btn-ghost-sm:hover { background: var(--row-hover); }
+.btn-google { width: 100%; background: var(--card-bg); color: var(--text); border-color: var(--border); }
+.btn-google:hover { background: var(--row-hover); }
+.btn-signup { background: var(--accent); color: #fff !important; padding: 6px 14px; font-size: 0.84rem; }
+
+.flash-stack { margin: 12px 0; display: grid; gap: 8px; }
+.flash { padding: 9px 12px; border-radius: 6px; font-size: 0.86rem; border: 1px solid var(--border); background: var(--neutral-bg); }
+.flash.error { color: var(--red); border-color: var(--red); background: rgba(220,38,38,.08); }
+.flash.ok { color: var(--green); border-color: var(--green); background: rgba(22,163,74,.08); }
+.flash.warn { color: var(--limitation-text); border-color: var(--limitation-border); background: var(--limitation-bg); margin-bottom: 10px; }
+.form-msg { min-height: 1.1em; margin-top: 6px; font-size: 0.84rem; color: var(--text-dim); }
+.form-msg.error { color: var(--red); }
+
+.user-chip {
+  display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.08);
+  color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 3px 12px 3px 4px;
+  font-size: 0.84rem; max-width: 190px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.user-chip:hover { background: rgba(255,255,255,.14); }
+.user-chip .avatar {
+  width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: inline-grid; place-items: center; font-weight: 700; font-size: 0.78rem; flex: none;
+}
+.user-menu { background: var(--card-bg); border: 1px solid var(--border); min-width: 210px; }
+.user-menu .dropdown-item { color: var(--text); font-size: 0.88rem; }
+.user-menu .dropdown-item:hover { background: var(--row-hover); }
+.user-menu .dropdown-divider { border-color: var(--border); }
+
+.quote-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn-watch {
+  font: inherit; font-size: 0.8rem; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text); border: 1px solid var(--border);
+}
+.btn-watch:hover { background: var(--row-hover); }
+.btn-watch.on { color: var(--amber); border-color: var(--amber); background: rgba(217,119,6,.1); }
+
+.add-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.add-row input { width: 240px; max-width: 100%; }
+table.data-table .num, table.data-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: none; }
+.holdings-table td, .holdings-table th { white-space: nowrap; }
+.badge-pill.sm { padding: 1px 9px; font-size: 0.72rem; }
+.btn-x { background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.95rem; padding: 2px 6px; border-radius: 4px; }
+.btn-x:hover { color: var(--red); background: rgba(220,38,38,.1); }
+
+.seg { position: relative; display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 14px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 6px 22px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--text-dim); margin: 0; }
+.seg input:checked + label { background: var(--accent); color: #fff; }
+.seg input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.legend-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; padding: 3px 0; }
+.legend-row .grow { flex: 1; }
+.legend-row .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.danger-zone { border-color: rgba(220,38,38,.45); }
+.modal-content .modal-footer { border-top: 1px solid var(--border); }
+.limitation-note { margin-top: 16px; }
+
+/* Small screens: the nav has no collapse menu, so let it wrap onto extra rows
+   instead of widening the whole page. */
+@media (max-width: 991.98px) {
+  .navbar .container-main { flex-wrap: wrap; row-gap: 8px; }
+  .navbar .container-main > .ms-auto {
+    order: 5; width: 100%; margin-left: 0 !important;
+    flex-wrap: wrap; row-gap: 6px; gap: 6px 14px !important;
+  }
+}
+
+/* Form validation + password toggle */
+.field input.invalid { border-color: #dc2626 !important; background: rgba(220, 38, 38, .06); }
+.field input.invalid:focus { outline-color: #dc2626; }
+.field-error { display: block; margin-top: 4px; font-size: .78rem; color: #dc2626; line-height: 1.5; }
+.field-error[hidden] { display: none; }
+.field-error a { color: inherit; text-decoration: underline; }
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 62px !important; }
+.pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: 0; padding: 4px 8px; border-radius: 6px;
+  font-size: .76rem; font-weight: 600; color: var(--accent); cursor: pointer;
+}
+.pw-toggle:hover { background: var(--row-hover); }
+.suggest-chip {
+  display: inline-block; margin: 4px 6px 0 0; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--card-bg); color: var(--accent);
+  font-size: .78rem; cursor: pointer;
+}
+.suggest-chip:hover { background: var(--row-hover); }
+.btn-google:disabled { opacity: .55; cursor: not-allowed; }
+.btn-link-sm { background: none; border: 0; padding: 2px 6px; font-size: .8rem; color: var(--accent); cursor: pointer; border-radius: 4px; }
+.btn-link-sm:hover { background: var(--row-hover); }
+#tx-ticker:not(:placeholder-shown) { text-transform: uppercase; }

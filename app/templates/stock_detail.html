@@ -11,6 +11,10 @@
     {% else %}
     <div class="text-dim" style="font-size:0.85rem;">Live market data only</div>
     {% endif %}
+    <div class="quote-actions">
+      <button type="button" class="btn-watch" id="watch-btn" data-ticker="{{ ticker }}" aria-pressed="false">☆ Watch</button>
+      <a class="btn-ghost-sm" href="{{ url_for('acct.portfolio', add=ticker) }}">+ Add to portfolio</a>
+    </div>
   </div>
   <div class="quote-price">
     <div class="ltp" id="q-ltp">{{ ('Rs. ' + quote.close|string) if quote else '—' }}</div>
@@ -124,6 +128,7 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
 <script>
+  initWatchButton();
   {% if has_history %}loadStockDetail("{{ ticker }}");{% endif %}
   initLiveQuote("{{ ticker }}");
   {% if has_history %}initForecast("{{ ticker }}");{% endif %}

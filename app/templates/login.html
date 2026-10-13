@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Log in · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>Log in</h1>
+  <p class="text-dim">Your watchlist and portfolio are private to your account.</p>
+  {% include "_flash.html" %}
+  <form method="post" action="{{ url_for('acct.login') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="field"><span>Email</span>
+      <input type="email" name="email" required autocomplete="email" autofocus value="{{ request.form.get('email','') }}">
+    </label>
+    <label class="field"><span>Password</span>
+      <input type="password" name="password" required autocomplete="current-password">
+    </label>
+    <button class="btn-primary-nepse" type="submit">Log in</button>
+  </form>
+  {% include "_google_button.html" %}
+  <p class="auth-alt">New here? <a href="{{ url_for('acct.register', next=next) if next else url_for('acct.register') }}">Create an account</a></p>
+</div>
+{% endblock %}

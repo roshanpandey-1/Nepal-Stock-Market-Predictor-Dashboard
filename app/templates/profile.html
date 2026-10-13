@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Profile · NEPSE Intelligence{% endblock %}
+{% block content %}
+<h1 class="page-title">Profile</h1>
+{% include "_flash.html" %}
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <h3>Account</h3>
+      <p class="text-dim mb-2">Signed in as <strong>{{ user.email }}</strong>{% if user.google_sub %} · Google linked{% endif %}</p>
+      <form method="post" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="name">
+        <label class="field"><span>Display name</span>
+          <input type="text" name="name" maxlength="80" value="{{ user.name or '' }}">
+        </label>
+        <button class="btn-primary-nepse sm" type="submit">Save name</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <h3>{{ 'Change password' if user.password_hash else 'Set a password' }}</h3>
+      <form method="post" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="password">
+        {% if user.password_hash %}
+        <label class="field"><span>Current password</span>
+          <input type="password" name="current_password" required autocomplete="current-password">
+        </label>
+        {% endif %}
+        <label class="field"><span>New password <em>(8+ characters, with a capital, a number and a special character)</em></span>
+          <input type="password" name="new_password" required minlength="8" autocomplete="new-password">
+        </label>
+        <label class="field"><span>Confirm new password</span>
+          <input type="password" name="confirm" required minlength="8" autocomplete="new-password">
+        </label>
+        <button class="btn-primary-nepse sm" type="submit">Update password</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-12">
+    <div class="card-panel danger-zone">
+      <h3>Delete account</h3>
+      <p class="text-dim">This permanently deletes your account, watchlist and every portfolio transaction. It can't be undone.</p>
+      <form method="post" class="d-flex flex-wrap gap-2 align-items-end" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="delete">
+        <label class="field mb-0" style="min-width:260px;"><span>Type <code>{{ user.email }}</code> to confirm</span>
+          <input type="text" name="confirm_email" autocomplete="off">
+        </label>
+        <button class="btn-danger-nepse" type="submit">Delete my account</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

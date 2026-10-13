@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Watchlist · NEPSE Intelligence{% endblock %}
+{% block content %}
+<h1 class="page-title">My Watchlist</h1>
+<p class="text-dim">Stocks you're keeping an eye on, with live prices and each sector model's latest signal.</p>
+
+<div class="card-panel" id="watchlist-panel">
+  <form class="add-row" id="watch-add-form" autocomplete="off">
+    <input type="text" id="watch-add-input" list="ticker-options" placeholder="Add a symbol, e.g. NABIL" maxlength="15"
+           aria-label="Symbol to add" style="text-transform:uppercase;">
+    <button class="btn-primary-nepse sm" type="submit">Add to watchlist</button>
+    <span class="form-msg" id="watch-add-msg" role="status"></span>
+  </form>
+  <datalist id="ticker-options"></datalist>
+
+  <div id="watchlist-body" class="mt-3"><span class="text-dim">Loading…</span></div>
+</div>
+
+<div class="limitation-note">
+  Signals come from the sector out-of-sample models. Most sectors lean heavily toward "Hold" on unseen data
+  (see <a href="{{ url_for('main.backtest') }}">Backtest</a>) — treat them as illustrative, not as trading advice.
+</div>
+{% endblock %}
+{% block scripts %}
+<script>initWatchlistPage();</script>
+{% endblock %}
