@@ -67,3 +67,28 @@ git commit -m "Refresh deploy_data snapshot"
 git push origin main
 ```
 Render redeploys automatically on every push to `main`.
+
+## Accounts, watchlist and portfolio (one-time setup)
+
+The dashboard stays public. Sign-up/login unlocks **Watchlist** and **My Portfolio**
+(buys/sells, weighted average cost, P/L at live prices, sector pie, signals).
+
+Render's free disk is wiped on every deploy, so user data must live in an external
+database. Without `DATABASE_URL` the app falls back to a local SQLite file and shows a
+warning: fine for development, but accounts would disappear on each deploy.
+
+1. **Database** – create a free Postgres on [Neon](https://neon.tech) or
+   [Supabase](https://supabase.com), copy its connection string
+   (`postgresql://user:pass@host/dbname?sslmode=require`).
+2. **Render → Environment** – set:
+   - `DATABASE_URL` = the connection string
+   - `SECRET_KEY` = any long random string (`render.yaml` generates one automatically on
+     first deploy; keep it stable, changing it logs everyone out)
+3. **Google sign-in (optional)** – Google Cloud Console → APIs & Services → Credentials →
+   OAuth client ID (Web). Authorised redirect URI:
+   `https://nepse-intelligence-albt.onrender.com/auth/google/callback`.
+   Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on Render. The "Continue with Google"
+   button only appears when both are set. Email + password login works without them.
+
+Tables are created automatically on first start. Profit/loss is gross (brokerage, SEBON,
+DP charges and capital gains tax are not modelled).

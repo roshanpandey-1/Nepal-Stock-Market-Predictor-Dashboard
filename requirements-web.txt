@@ -8,6 +8,14 @@
 flask==3.1.0
 flask-cors==4.0.0
 gunicorn==21.2.0
+
+# User accounts / watchlist / portfolio (app/accounts.py). DATABASE_URL points at
+# a free hosted Postgres (Neon/Supabase); psycopg2-binary is its driver.
+Flask-SQLAlchemy==3.1.1
+psycopg2-binary==2.9.9
+# Google sign-in (only active when GOOGLE_CLIENT_ID/SECRET are set)
+Authlib==1.3.2
+requests>=2.31
 numpy==1.26.2
 scikit-learn==1.3.2
 xgboost==2.0.2

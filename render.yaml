@@ -10,3 +10,15 @@ services:
         value: deploy_data
       - key: PYTHON_VERSION
         value: 3.11.9
+      # Accounts. SECRET_KEY signs login sessions; DATABASE_URL is your Neon/Supabase
+      # Postgres connection string. Render's free disk is wiped on every deploy, so
+      # without DATABASE_URL accounts would vanish. Set the sync:false values in the
+      # Render dashboard (Environment tab).
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

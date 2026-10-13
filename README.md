@@ -95,6 +95,15 @@ DATA_DIR=deploy_data python run.py
 | `python examples/build_deploy_snapshot.py` | Regenerate `deploy_data/` for deployment |
 | `pytest` | Run the test suite (23 tests) |
 
+### Accounts, watchlist and portfolio
+
+Optional login (email + password, or Google) unlocks a **Watchlist** and a Meroshare-style
+**My Portfolio**: add a scrip and the number of shares you hold, and the app shows the balance,
+last closing price, LTP, value at each, today's change, a sector pie and the model's latest signal
+for each holding. See
+[DEPLOYMENT.md](DEPLOYMENT.md#accounts-watchlist-and-portfolio-one-time-setup) for the
+database (`DATABASE_URL`) and Google OAuth setup.
+
 ## 📊 Results
 
 Buy/Sell/Hold classifiers, one per NEPSE sector, trained on a rolling 2-year window ending September 2026. All figures below are from the **chronological holdout** (last 3 months, unseen during training).

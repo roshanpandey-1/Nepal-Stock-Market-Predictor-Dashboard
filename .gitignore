@@ -42,3 +42,6 @@ data/models/
 
 # Full price-history bundle (distributed via a GitHub release, not git)
 data-snapshot.tar.gz
+
+# Local accounts database (development only)
+instance/
