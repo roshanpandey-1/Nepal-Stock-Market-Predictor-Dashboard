@@ -3,6 +3,7 @@ services:
     name: nepse-intelligence
     runtime: python
     plan: free
+    healthCheckPath: /healthz
     buildCommand: "pip install -r requirements-web.txt"
     startCommand: "gunicorn run:app --bind 0.0.0.0:$PORT --timeout 120"
     envVars:

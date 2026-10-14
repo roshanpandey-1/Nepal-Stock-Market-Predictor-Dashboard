@@ -66,6 +66,12 @@ def create_app(test_config=None):
     app.register_blueprint(main)
     app.register_blueprint(api, url_prefix="/api")
 
+    @app.route("/healthz")
+    def healthz():
+        # Tiny, database-free page for uptime pingers (keeps Render's free
+        # plan from sleeping) and Render's own health check.
+        return "ok", 200, {"Cache-Control": "no-store", "Content-Type": "text/plain"}
+
     _init_accounts(app)
     return app
 

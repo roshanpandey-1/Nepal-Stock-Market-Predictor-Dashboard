@@ -295,3 +295,9 @@ def test_mailer_posts_to_brevo_and_falls_back_to_logging(monkeypatch):
     assert mailer.send_email("x@gmail.com", "Hello", "body", "<p>body</p>") is True
     assert seen["url"].endswith("/v3/smtp/email") and seen["headers"]["api-key"] == "k"
     assert seen["json"]["to"] == [{"email": "x@gmail.com"}] and seen["json"]["sender"]["email"] == "me@gmail.com"
+
+
+def test_healthz_is_fast_and_public(client):
+    r = client.get("/healthz")
+    assert r.status_code == 200 and r.data == b"ok"
+    assert client.head("/healthz").status_code == 200
