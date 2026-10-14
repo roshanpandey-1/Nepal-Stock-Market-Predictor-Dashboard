@@ -24,7 +24,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from . import mailer
-from .models import Holding, User, WatchlistItem, db
+from .models import Holding, SearchHistory, User, WatchlistItem, db
+from . import insights
 from . import portfolio_utils as pu
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,8 @@ TICKER_RE = re.compile(r"^[A-Z0-9]{1,15}$")
 MAX_WATCHLIST = 100
 MAX_HOLDINGS = 500
 MAX_QTY = 10_000_000
+SEARCH_HISTORY_SHOWN = 5
+SEARCH_HISTORY_KEPT = 20  # older rows are pruned; extra ones feed the stock ideas
 MIN_PASSWORD = 8
 
 
@@ -433,7 +436,7 @@ def _price_for(ticker):
     name = (live or {}).get("name") if live else None
     name = r._company_names().get(ticker) or name or ticker
     out = {"name": name, "sector": r._ticker_sector(ticker), "lcp": None, "ltp": None,
-           "change": None, "change_pct": None, "source": None, "market_open": None}
+           "prev_close": None, "change": None, "change_pct": None, "source": None, "market_open": None}
     if live and live.get("ltp") is not None:
         out["ltp"] = live["ltp"]
         out["market_open"] = live.get("market_open")
@@ -443,9 +446,14 @@ def _price_for(ticker):
             out["lcp"] = live.get("prev_close") or (processed or {}).get("close") or live["ltp"]
         else:
             out["lcp"] = live["ltp"]
+        out["prev_close"] = live.get("prev_close") or (processed or {}).get("prev_close")
+        if out["change"] is None and out["prev_close"]:
+            out["change"] = round(out["ltp"] - out["prev_close"], 2)
+            out["change_pct"] = round((out["ltp"] / out["prev_close"] - 1) * 100, 2)
         out["source"] = "live"
     elif processed:
         out["ltp"] = out["lcp"] = processed["close"]
+        out["prev_close"] = processed.get("prev_close")
         out["change"] = processed.get("change")
         out["change_pct"] = processed.get("change_pct")
         out["source"] = f"close {processed['date']}"
@@ -584,3 +592,81 @@ def api_holding_delete(ticker):
     db.session.delete(h)
     db.session.commit()
     return jsonify({"ok": True})
+
+
+# --- JSON API: search history ----------------------------------------------------
+def _history_rows(user, limit):
+    return (SearchHistory.query.filter_by(user_id=user.id)
+            .order_by(SearchHistory.searched_at.desc(), SearchHistory.id.desc()).limit(limit).all())
+
+
+@acct.route("/api/me/search-history", methods=["GET"])
+@login_required
+def api_search_history():
+    from . import routes as r
+    names = r._company_names()
+    rows = _history_rows(current_user(), SEARCH_HISTORY_SHOWN)
+    return jsonify({"ok": True, "items": [{"t": h.ticker, "n": names.get(h.ticker, h.ticker)} for h in rows]})
+
+
+@acct.route("/api/me/search-history", methods=["POST"])
+@login_required
+def api_search_history_add():
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    ticker = str(data.get("ticker") or "").strip().upper()
+    if not TICKER_RE.match(ticker) or not _known_ticker(ticker):
+        return jsonify({"ok": False, "error": "Unknown symbol."}), 400
+    row = SearchHistory.query.filter_by(user_id=user.id, ticker=ticker).first()
+    if row is None:
+        db.session.add(SearchHistory(user_id=user.id, ticker=ticker))
+    else:
+        row.searched_at = datetime.now().astimezone()
+    db.session.commit()
+    stale = _history_rows(user, 1000)[SEARCH_HISTORY_KEPT:]
+    for old in stale:
+        db.session.delete(old)
+    if stale:
+        db.session.commit()
+    return jsonify({"ok": True})
+
+
+@acct.route("/api/me/search-history", methods=["DELETE"])
+@login_required
+def api_search_history_clear():
+    SearchHistory.query.filter_by(user_id=current_user().id).delete()
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+# --- JSON API: stock ideas and holdings forecast ------------------------------------
+@acct.route("/api/me/recommendations")
+@login_required
+def api_recommendations():
+    from . import routes as r
+    user = current_user()
+    held = [h.ticker for h in Holding.query.filter_by(user_id=user.id).all()]
+    searched = [h.ticker for h in _history_rows(user, SEARCH_HISTORY_KEPT)]
+    watching = [w.ticker for w in WatchlistItem.query.filter_by(user_id=user.id).all()]
+    try:
+        limit = max(1, min(10, int(request.args.get("limit", 5))))
+    except ValueError:
+        limit = 5
+    stats = insights.market_stats(r._ticker_list())
+    summary, _ = insights.load_forecasts()
+    ideas = insights.recommend(held, searched, stats, summary, names=r._company_names(),
+                               limit=limit, exclude=watching)
+    return jsonify({"ok": True, "items": ideas,
+                    "basis": ideas[0]["basis"] if ideas else ("personal" if held or searched else "market")})
+
+
+@acct.route("/api/me/portfolio/forecast")
+@login_required
+def api_portfolio_forecast():
+    user = current_user()
+    quantities = {h.ticker: h.quantity for h in Holding.query.filter_by(user_id=user.id).all()}
+    prices = {t: _price_for(t) for t in quantities}
+    rows, _ = pu.value_holdings(quantities, prices)
+    summary, daily = insights.load_forecasts()
+    out = insights.holdings_forecast(rows, summary, daily)
+    return jsonify({"ok": True, **out})

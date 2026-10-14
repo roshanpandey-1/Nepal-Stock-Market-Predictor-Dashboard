@@ -28,6 +28,7 @@ class User(db.Model):
 
     watchlist = db.relationship("WatchlistItem", backref="user", cascade="all, delete-orphan")
     holdings = db.relationship("Holding", backref="user", cascade="all, delete-orphan")
+    searches = db.relationship("SearchHistory", backref="user", cascade="all, delete-orphan")
 
     @property
     def display_name(self):
@@ -56,3 +57,15 @@ class Holding(db.Model):
     ticker = db.Column(db.String(20), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     updated_at = db.Column(db.DateTime(timezone=True), default=_now, onupdate=_now, nullable=False)
+
+
+class SearchHistory(db.Model):
+    """Tickers a user opened from the search bar; one row per ticker, newest wins."""
+    __tablename__ = "search_history"
+    __table_args__ = (db.UniqueConstraint("user_id", "ticker", name="uq_search_user_ticker"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"),
+                        nullable=False, index=True)
+    ticker = db.Column(db.String(20), nullable=False)
+    searched_at = db.Column(db.DateTime(timezone=True), default=_now, nullable=False)

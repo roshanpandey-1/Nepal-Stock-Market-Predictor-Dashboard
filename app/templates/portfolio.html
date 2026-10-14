@@ -9,10 +9,17 @@
 
 <div class="row g-2 mb-3" id="pf-tiles">
   <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Value at LTP</div><div class="value" id="pf-value">—</div></div></div>
-  <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Today's change</div><div class="value" id="pf-day">—</div></div></div>
+  <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label" id="pf-day-label">Today's change</div><div class="value" id="pf-day">—</div></div></div>
   <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Scrips held</div><div class="value" id="pf-count">—</div></div></div>
 </div>
 
+<div class="pf-tabs" role="tablist" aria-label="Portfolio sections">
+  <button type="button" role="tab" id="tab-holdings" aria-controls="pf-holdings" aria-selected="true" data-tab="holdings">Holdings</button>
+  <button type="button" role="tab" id="tab-forecast" aria-controls="pf-forecast" aria-selected="false" data-tab="forecast" tabindex="-1">Forecast</button>
+  <button type="button" role="tab" id="tab-ideas" aria-controls="pf-ideas" aria-selected="false" data-tab="ideas" tabindex="-1">Ideas</button>
+</div>
+
+<section id="pf-holdings" role="tabpanel" aria-labelledby="tab-holdings">
 <div class="row g-3">
   <div class="col-xl-8">
     <div class="card-panel h-100">
@@ -33,6 +40,57 @@
   </div>
 </div>
 
+</section>
+
+<section id="pf-forecast" role="tabpanel" aria-labelledby="tab-forecast" hidden>
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Value now</div><div class="value" id="fc-now">—</div></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Projected in 30 days</div><div class="value" id="fc-proj">—</div></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Expected change</div><div class="value" id="fc-chg">—</div></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Forecast range</div><div class="value" id="fc-range" style="font-size:1rem;">—</div></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-xl-6">
+      <div class="card-panel h-100">
+        <h3>Expected move by holding</h3>
+        <p class="text-dim fc-help">Bar = the forecast's likely range in 30 days, ◆ = the central forecast, both measured from today's price.</p>
+        <div class="chart-box" id="fc-range-box"><canvas id="fc-range-chart"></canvas></div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="card-panel h-100">
+        <h3 class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <span>Forecast path</span>
+          <select id="fc-pick" class="form-select form-select-sm fc-pick" aria-label="Holding to chart"></select>
+        </h3>
+        <div class="fc-path-meta" id="fc-path-meta"></div>
+        <div class="chart-box"><canvas id="fc-path-chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-panel">
+    <h3>Forecast by holding</h3>
+    <div class="table-scroll" id="fc-table"><span class="text-dim">Loading…</span></div>
+    <p class="text-dim mt-2 mb-0" id="fc-foot" style="font-size:0.74rem;"></p>
+  </div>
+</section>
+
+<section id="pf-ideas" role="tabpanel" aria-labelledby="tab-ideas" hidden>
+  <div class="card-panel">
+    <h3>Ideas to research</h3>
+    <p class="text-dim fc-help" id="ideas-basis"></p>
+    <div id="ideas-list" class="ideas-grid"><span class="text-dim">Loading…</span></div>
+  </div>
+  <div class="limitation-note">
+    These ideas come from simple rules, not from a model that has been shown to pick winners: stocks in the sectors
+    you hold or search, from the more actively traded half of the market, ranked by their 30-day Prophet forecast
+    and their last 20 sessions of price movement. Forecasts are illustrative and often wrong. Treat this as a
+    starting list to research, not as a recommendation to buy.
+  </div>
+</section>
+
 <div class="limitation-note">
   Signals are shown for reference only. They come from sector out-of-sample models that mostly lean toward "Hold" on unseen data
   (see <a href="{{ url_for('main.backtest') }}">Backtest</a>), and are not trading advice.
@@ -48,9 +106,11 @@
         </div>
         <div class="modal-body">
           <label class="field"><span>Symbol</span>
-            <input type="text" name="ticker" id="tx-ticker" list="ticker-options" maxlength="15" required placeholder="Search a symbol, e.g. NABIL">
+            <span class="ts-wrap d-block">
+              <input type="text" name="ticker" id="tx-ticker" maxlength="40" required placeholder="Search a symbol or company, e.g. NABIL">
+              <span class="nav-search-results ts-results" id="tx-ticker-results"></span>
+            </span>
           </label>
-          <datalist id="ticker-options"></datalist>
           <label class="field"><span>Quantity <em>(shares you own)</em></span>
             <input type="number" name="quantity" min="1" step="1" required inputmode="numeric">
           </label>

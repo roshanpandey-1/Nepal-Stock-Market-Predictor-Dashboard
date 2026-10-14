@@ -301,3 +301,22 @@ def test_healthz_is_fast_and_public(client):
     r = client.get("/healthz")
     assert r.status_code == 200 and r.data == b"ok"
     assert client.head("/healthz").status_code == 200
+
+
+def test_todays_change_uses_previous_close_even_after_the_close():
+    # market closed: LCP == LTP (Meroshare style) but the session still moved +10/share
+    rows, tot = value_holdings({"A": 10, "B": 4}, {
+        "A": {"lcp": 120, "ltp": 120, "change": 10.0, "change_pct": 9.09},
+        "B": {"lcp": 50, "ltp": 50, "change": -2.5, "change_pct": -4.76}})
+    a = next(r for r in rows if r["ticker"] == "A")
+    assert a["day_pl"] == 100 and a["change_pct"] == 9.09
+    assert tot["day_pl"] == 90 and tot["day_pct"] == round(90 / (1400 - 90) * 100, 2)
+
+
+def test_portfolio_api_reports_todays_change(client):
+    _signup(client)
+    tok = _token(client)
+    client.post("/api/me/holdings", json={"ticker": "NABIL", "quantity": 5}, headers={"X-CSRF-Token": tok})
+    d = client.get("/api/me/portfolio").get_json()
+    assert d["totals"]["day_pl"] == 50.0          # 5 shares x +10 vs previous close
+    assert d["holdings"][0]["change_pct"] == 1.01

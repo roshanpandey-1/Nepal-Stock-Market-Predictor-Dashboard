@@ -49,13 +49,24 @@ async function _fillSignals(root) {
   }));
 }
 
-async function _fillTickerOptions() {
-  const list = document.getElementById("ticker-options");
-  if (!list) return;
-  try {
-    const rows = await (await fetch("/api/tickers")).json();
-    list.innerHTML = rows.map(r => `<option value="${_esc(r.t)}">${_esc(r.n)}</option>`).join("");
-  } catch (e) { /* the field still accepts typed symbols */ }
+// Symbol pickers on the watchlist and portfolio pages reuse the navbar's
+// autocomplete (attachTickerSearch in charts.js) instead of a <datalist>,
+// which dumped every ticker at once.
+function _wirePicker(inputId, boxId, onPick) {
+  const input = document.getElementById(inputId), box = document.getElementById(boxId);
+  if (input && box && window.attachTickerSearch) attachTickerSearch(input, box, { onPick });
+}
+
+// The picker field may hold "NABIL" or a typed company name; resolve to a symbol.
+async function _resolveSymbol(text) {
+  const v = String(text || "").trim();
+  if (!v) return "";
+  if (window._loadTickerIndex) {
+    await _loadTickerIndex();
+    const best = _matchTickers(v)[0];
+    if (best && (best.t.toLowerCase() === v.toLowerCase() || !/^[A-Za-z0-9]{1,15}$/.test(v))) return best.t;
+  }
+  return v.toUpperCase();
 }
 
 // --- watch button on stock pages --------------------------------------------------
@@ -98,7 +109,11 @@ async function initWatchlistPage() {
   const body = document.getElementById("watchlist-body");
   if (!body) return;
   const msg = document.getElementById("watch-add-msg");
-  _fillTickerOptions();
+  _wirePicker("watch-add-input", "watch-add-results", (row) => {
+    const input = document.getElementById("watch-add-input");
+    input.value = row.t;
+    document.getElementById("watch-add-form").requestSubmit();
+  });
 
   async function load() {
     try {
@@ -137,12 +152,13 @@ async function initWatchlistPage() {
   document.getElementById("watch-add-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = document.getElementById("watch-add-input");
-    const ticker = input.value.trim().toUpperCase();
+    const ticker = await _resolveSymbol(input.value);
     if (!ticker) return;
     msg.textContent = ""; msg.className = "form-msg";
     try {
       await acctApi("/api/me/watchlist", { method: "POST", body: { ticker } });
       input.value = "";
+      msg.textContent = `${ticker} added.`; msg.className = "form-msg ok";
       await load();
     } catch (err) { msg.textContent = err.message; msg.className = "form-msg error"; }
   });
@@ -155,17 +171,25 @@ let _sectorChart = null;
 const _SECTOR_COLORS = ["#2f6fdb", "#16a34a", "#d97706", "#dc2626", "#8b5cf6", "#0891b2", "#db2777",
                         "#65a30d", "#ea580c", "#475569", "#0d9488", "#a16207", "#6366f1"];
 
+let _pfMarketOpen = null;
 function _renderPortfolio(d) {
   const t = d.totals;
+  _pfMarketOpen = d.market_open;
   const setTile = (id, text, cls) => {
     const el = document.getElementById(id);
     el.textContent = text;
     el.className = "value " + (cls || "");
   };
   setTile("pf-value", `Rs ${_rs(t.value_ltp)}`);
-  setTile("pf-day", _signed(t.day_pl), _signCls(t.day_pl));
+  const dayEl = document.getElementById("pf-day");
+  dayEl.innerHTML = `${_esc(_signed(t.day_pl))}${t.day_pct == null ? "" : ` <small>(${_esc(_signedPct(t.day_pct))})</small>`}`;
+  dayEl.className = "value " + _signCls(t.day_pl);
+  // After the close it is still today's move (LTP vs previous close), so say which session it is.
+  document.getElementById("pf-day-label").textContent =
+    d.market_open === false ? "Change (last session)" : "Today's change";
   setTile("pf-count", String(t.count));
-  document.getElementById("pf-source").textContent = d.market_open === true ? "market open · live"
+  document.getElementById("pf-source").textContent = d.market_open === true
+    ? `market open · live · ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kathmandu" })}`
     : d.market_open === false ? "market closed" : "last close";
 
   const wrap = document.getElementById("holdings-wrap");
@@ -234,11 +258,18 @@ function _renderPortfolio(d) {
 async function initPortfolioPage() {
   const wrap = document.getElementById("holdings-wrap");
   if (!wrap) return;
-  _fillTickerOptions();
+  _wirePicker("tx-ticker", "tx-ticker-results", (row) => {
+    const f = document.getElementById("tx-form");
+    f.ticker.value = row.t;
+    f.quantity.focus();
+  });
 
   async function load() {
     try {
       _renderPortfolio(await acctApi("/api/me/portfolio"));
+      // holdings changed: refresh the other tabs next time they're shown (or now, if visible)
+      if (_fcData) { _fcData = null; if (!document.getElementById("pf-forecast").hidden) _loadForecastTab(); }
+      if (_ideasLoaded) { _ideasLoaded = false; if (!document.getElementById("pf-ideas").hidden) _loadIdeasTab(); }
     } catch (e) {
       wrap.innerHTML = `<p class="text-dim mb-0">${_esc(e.message)}</p>`;
     }
@@ -253,8 +284,9 @@ async function initPortfolioPage() {
     form.ticker.value = prefill.ticker || "";
     form.quantity.value = prefill.quantity || "";
     document.getElementById("tx-modal-title").textContent = prefill.quantity ? `Edit ${prefill.ticker}` : "Add holding";
+    // focus once Bootstrap has finished showing the dialog (it moves focus itself on "shown")
+    modalEl.addEventListener("shown.bs.modal", () => (prefill.ticker ? form.quantity : form.ticker).focus(), { once: true });
     modal().show();
-    setTimeout(() => (prefill.ticker ? form.quantity : form.ticker).focus(), 300);
   }
   document.getElementById("open-tx-modal").addEventListener("click", () => openModal());
 
@@ -266,7 +298,7 @@ async function initPortfolioPage() {
     btn.disabled = true;
     try {
       await acctApi("/api/me/holdings", { method: "POST", body: {
-        ticker: String(fd.get("ticker")).trim().toUpperCase(), quantity: fd.get("quantity"),
+        ticker: await _resolveSymbol(fd.get("ticker")), quantity: fd.get("quantity"),
       } });
       form.quantity.value = ""; form.ticker.value = "";
       modal().hide();
@@ -293,8 +325,270 @@ async function initPortfolioPage() {
   });
 
   const add = new URLSearchParams(location.search).get("add");
+  _initPortfolioTabs();
   await load();
+
+  // While the market is open, re-value holdings every 60s (the server's live
+  // snapshot refreshes about once a minute). Paused while the tab is hidden
+  // or the edit dialog is open, and caught up as soon as the page is visible.
+  const REFRESH_MS = 60000;
+  let lastLoad = Date.now();
+  const refresh = async () => {
+    if (document.hidden || modalEl.classList.contains("show")) return;
+    if (_pfMarketOpen !== true) return;
+    lastLoad = Date.now();
+    await load();
+  };
+  setInterval(refresh, REFRESH_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && Date.now() - lastLoad > REFRESH_MS) refresh();
+  });
   if (add) openModal({ ticker: add.toUpperCase() });
+}
+
+// --- portfolio tabs: Holdings / Forecast / Ideas ------------------------------------
+let _fcData = null, _fcRangeChart = null, _fcPathChart = null;
+const _todayISO = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });
+
+function _renderForecastRange(items) {
+  const box = document.getElementById("fc-range-box");
+  const canvas = document.getElementById("fc-range-chart");
+  if (_fcRangeChart) { _fcRangeChart.destroy(); _fcRangeChart = null; }
+  if (!window.Chart || !items.length) return;
+  box.style.height = `${Math.max(_isPhone() ? 200 : 300, items.length * 34 + 70)}px`;
+  const c = CHART_COLORS;
+  _fcRangeChart = new Chart(canvas, {
+    data: {
+      labels: items.map(i => i.ticker),
+      datasets: [
+        { type: "bar", label: "Likely range", data: items.map(i => [i.lower_pct, i.upper_pct]),
+          backgroundColor: items.map(i => i.change_pct >= 0 ? "rgba(22,163,74,0.22)" : "rgba(220,38,38,0.22)"),
+          borderColor: items.map(i => i.change_pct >= 0 ? c.green : c.red), borderWidth: 1,
+          borderRadius: 4, borderSkipped: false, barThickness: 16 },
+        { type: "line", label: "Forecast", data: items.map(i => i.change_pct), showLine: false,
+          pointStyle: "rectRot", pointRadius: 6, pointHoverRadius: 7,
+          pointBackgroundColor: items.map(i => i.change_pct >= 0 ? c.green : c.red), pointBorderColor: c.bg },
+      ],
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: (ctx) => {
+            const it = items[ctx.dataIndex];
+            return ctx.datasetIndex === 0
+              ? `Range ${_signedPct(it.lower_pct)} to ${_signedPct(it.upper_pct)}`
+              : `Forecast ${_signedPct(it.change_pct)} (Rs ${_rs(it.forecast_price)})`;
+          } } },
+      },
+      scales: {
+        x: { ticks: { callback: (v) => `${v > 0 ? "+" : ""}${v}%` },
+             grid: { color: (g) => (g.tick && g.tick.value === 0 ? c.text : c.grid) } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+}
+
+function _renderForecastPath(item) {
+  const canvas = document.getElementById("fc-path-chart");
+  const meta = document.getElementById("fc-path-meta");
+  if (_fcPathChart) { _fcPathChart.destroy(); _fcPathChart = null; }
+  if (!item) { meta.innerHTML = ""; return; }
+  const today = _todayISO();
+  const path = (item.path || []).filter(p => p.date >= today);
+  meta.innerHTML = `<strong>${_esc(item.ticker)}</strong> · ${item.quantity.toLocaleString("en-IN")} shares ·
+    now Rs ${_rs(item.ltp)} → <span class="${_signCls(item.change_pct)}">Rs ${_rs(item.forecast_price)} (${_signedPct(item.change_pct)})</span>
+    <span class="text-dim">· projected value Rs ${_rs(item.value_forecast)}</span>`;
+  if (!window.Chart || !path.length) return;
+  const c = CHART_COLORS;
+  const labels = ["Now", ...path.map(p => _shortDay(p.date))];
+  const up = item.change_pct >= 0;
+  const line = up ? c.green : c.red;
+  _fcPathChart = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Upper", data: [item.ltp, ...path.map(p => p.hi)], borderWidth: 0, pointRadius: 0,
+          fill: "+1", backgroundColor: up ? "rgba(22,163,74,0.12)" : "rgba(220,38,38,0.12)", tension: 0.35 },
+        { label: "Lower", data: [item.ltp, ...path.map(p => p.lo)], borderWidth: 0, pointRadius: 0, fill: false, tension: 0.35 },
+        { label: "Forecast", data: [item.ltp, ...path.map(p => p.p)], borderColor: line, borderWidth: 2,
+          pointRadius: 0, pointHoverRadius: 4, tension: 0.35, fill: false },
+        { label: "Today's price", data: labels.map(() => item.ltp), borderColor: c.text, borderWidth: 1,
+          borderDash: [5, 4], pointRadius: 0, fill: false },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { filter: (t) => t.datasetIndex !== 3,
+                   callbacks: { label: (t) => `${t.dataset.label}: Rs ${_rs(t.parsed.y)}` } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: _isPhone() ? 4 : 7, maxRotation: 0 } },
+        y: { position: "right", ticks: { maxTicksLimit: 5 } },
+      },
+    },
+  });
+}
+
+function _shortDay(iso) {
+  const d = new Date(iso + "T00:00:00Z");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+function _renderForecastTab(d) {
+  const t = d.totals;
+  const set = (id, html, cls) => { const el = document.getElementById(id); el.innerHTML = html; el.className = "value " + (cls || ""); };
+  const table = document.getElementById("fc-table");
+  const foot = document.getElementById("fc-foot");
+  if (!d.items.length) {
+    ["fc-now", "fc-proj", "fc-chg", "fc-range"].forEach(id => set(id, "—"));
+    table.innerHTML = `<p class="text-dim mb-0">${d.missing.length ? "None of your holdings have a forecast yet." : "Add a holding to see its forecast."}</p>`;
+    foot.textContent = "";
+    _renderForecastRange([]); _renderForecastPath(null);
+    document.getElementById("fc-pick").innerHTML = "";
+    return;
+  }
+  set("fc-now", `Rs ${_rs(t.value_now, 0)}`);
+  set("fc-proj", `Rs ${_rs(t.value_forecast, 0)}`, _signCls(t.value_change));
+  set("fc-chg", `${_signed(t.value_change, 0)} <small>(${_signedPct(t.change_pct)})</small>`, _signCls(t.value_change));
+  set("fc-range", `Rs ${_rs(t.value_low, 0)} – ${_rs(t.value_high, 0)}`);
+
+  table.innerHTML = `<table class="data-table fc-table">
+    <thead><tr><th>Scrip</th><th class="num">Qty</th><th class="num">LTP</th><th class="num">30-day forecast</th>
+      <th class="num">Expected</th><th class="num">Likely range</th><th class="num">Value now</th><th class="num">Projected value</th><th class="num">Change</th></tr></thead>
+    <tbody>${d.items.map(r => `<tr data-fc="${_esc(r.ticker)}" tabindex="0" title="Show ${_esc(r.ticker)} on the chart">
+      <td><a href="/stock/${encodeURIComponent(r.ticker)}">${_esc(r.ticker)}</a>${r.rescaled ? ` <span class="text-dim" title="Price moved 20%+ since the forecast ran; see note below">*</span>` : ""}</td>
+      <td class="num">${r.quantity.toLocaleString("en-IN")}</td>
+      <td class="num">${_rs(r.ltp)}</td>
+      <td class="num">${_rs(r.forecast_price)}</td>
+      <td class="num ${_signCls(r.change_pct)}">${_signedPct(r.change_pct)}</td>
+      <td class="num text-dim">${_rs(r.lower_bound)} – ${_rs(r.upper_bound)}</td>
+      <td class="num">${_rs(r.value_now)}</td>
+      <td class="num">${_rs(r.value_forecast)}</td>
+      <td class="num ${_signCls(r.value_change)}">${_signed(r.value_change)}</td>
+    </tr>`).join("")}</tbody>
+    <tfoot><tr><td><strong>Total</strong></td><td></td><td></td><td></td>
+      <td class="num ${_signCls(t.change_pct)}"><strong>${_signedPct(t.change_pct)}</strong></td><td></td>
+      <td class="num"><strong>${_rs(t.value_now)}</strong></td><td class="num"><strong>${_rs(t.value_forecast)}</strong></td>
+      <td class="num ${_signCls(t.value_change)}"><strong>${_signed(t.value_change)}</strong></td></tr></tfoot></table>`;
+
+  const wide = d.items.filter(i => i.band_pct >= 40).map(i => i.ticker);
+  const rescaled = d.items.filter(i => i.rescaled).map(i => i.ticker);
+  foot.innerHTML = [
+    d.generated_at ? `Prophet forecasts generated ${_esc(d.generated_at)}, compared with today's price.` : "",
+    "The range total adds up each stock's own range, so the true portfolio range is narrower.",
+    wide.length ? `Very wide ranges (40%+ of the price), so treat these with extra caution: ${wide.map(_esc).join(", ")}.` : "",
+    rescaled.length ? `The price has moved more than 20% since the forecast ran, so its expected move is applied to today's price: ${rescaled.map(_esc).join(", ")}.` : "",
+    d.missing.length ? `No forecast yet for: ${d.missing.map(_esc).join(", ")}.` : "",
+  ].filter(Boolean).join(" ");
+
+  _renderForecastRange(d.items);
+  const pick = document.getElementById("fc-pick");
+  const keep = pick.value;
+  pick.innerHTML = d.items.map(i => `<option value="${_esc(i.ticker)}">${_esc(i.ticker)} (${_signedPct(i.change_pct)})</option>`).join("");
+  if (d.items.some(i => i.ticker === keep)) pick.value = keep;
+  _renderForecastPath(d.items.find(i => i.ticker === pick.value) || d.items[0]);
+}
+
+async function _loadForecastTab(force) {
+  if (_fcData && !force) return;
+  const table = document.getElementById("fc-table");
+  try {
+    _fcData = await acctApi("/api/me/portfolio/forecast");
+    _renderForecastTab(_fcData);
+  } catch (e) {
+    table.innerHTML = `<p class="text-dim mb-0">${_esc(e.message)}</p>`;
+  }
+}
+
+let _ideasLoaded = false;
+async function _loadIdeasTab(force) {
+  if (_ideasLoaded && !force) return;
+  const list = document.getElementById("ideas-list");
+  const basis = document.getElementById("ideas-basis");
+  try {
+    const d = await acctApi("/api/me/recommendations?limit=6");
+    _ideasLoaded = true;
+    basis.textContent = d.basis === "personal"
+      ? "Picked from the sectors of the stocks you hold and search for. Stocks you already hold, searched or watch are left out."
+      : "Add holdings or search for a few stocks to get ideas from your sectors. For now these are picked across the whole market.";
+    if (!d.items.length) {
+      list.innerHTML = `<p class="text-dim mb-0">No ideas right now: nothing in your sectors has both a positive forecast and positive recent momentum.</p>`;
+      return;
+    }
+    list.innerHTML = d.items.map(r => `<article class="idea-card">
+      <div class="idea-top">
+        <a class="idea-sym" href="/stock/${encodeURIComponent(r.ticker)}">${_esc(r.ticker)}</a>
+        <span class="ts-tag ${r.forecast_pct >= 0 ? "pos" : "neg"}" title="30-day forecast">${_signedPct(r.forecast_pct)}</span>
+      </div>
+      <div class="idea-name">${_esc(r.name)}</div>
+      <div class="text-dim idea-sector">${_esc(r.sector || "")} · Rs ${_rs(r.close)}</div>
+      <ul class="idea-why">${r.reasons.map(x => `<li>${_esc(x)}</li>`).join("")}</ul>
+      <div class="idea-actions">
+        <a class="btn-ghost-sm" href="/stock/${encodeURIComponent(r.ticker)}">View</a>
+        <button class="btn-ghost-sm" type="button" data-watch-idea="${_esc(r.ticker)}">☆ Watch</button>
+      </div>
+    </article>`).join("");
+  } catch (e) {
+    list.innerHTML = `<p class="text-dim mb-0">${_esc(e.message)}</p>`;
+  }
+}
+
+function _initPortfolioTabs() {
+  const tabs = [...document.querySelectorAll(".pf-tabs [role=tab]")];
+  if (!tabs.length) return;
+  function show(name, focus) {
+    tabs.forEach(t => {
+      const on = t.dataset.tab === name;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+      if (on && focus) t.focus();
+    });
+    if (name === "forecast") _loadForecastTab();
+    if (name === "ideas") _loadIdeasTab();
+    if (history.replaceState) history.replaceState(null, "", name === "holdings" ? location.pathname + location.search : `#${name}`);
+  }
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => show(t.dataset.tab));
+    t.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+      show(n.dataset.tab, true);
+    });
+  });
+  document.getElementById("fc-pick").addEventListener("change", (e) => {
+    _renderForecastPath((_fcData?.items || []).find(i => i.ticker === e.target.value));
+  });
+  document.getElementById("fc-table").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-fc]");
+    if (!tr || e.target.closest("a")) return;
+    const pick = document.getElementById("fc-pick");
+    pick.value = tr.dataset.fc;
+    pick.dispatchEvent(new Event("change"));
+    document.getElementById("fc-path-chart").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+  document.getElementById("ideas-list").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-watch-idea]");
+    if (!b) return;
+    b.disabled = true;
+    try {
+      await acctApi("/api/me/watchlist", { method: "POST", body: { ticker: b.dataset.watchIdea } });
+      b.textContent = "★ Watching";
+    } catch (err) { b.title = err.message; b.disabled = false; }
+  });
+  const fromHash = () => {
+    const h = (location.hash || "").slice(1);
+    if (["holdings", "forecast", "ideas"].includes(h)) show(h);
+  };
+  window.addEventListener("hashchange", fromHash);   // e.g. "See why" in the search box while on this page
+  fromHash();
 }
 
 /* ---- Sign-up / password forms: show-hide toggle, live confirm check, email suggestions ---- */
