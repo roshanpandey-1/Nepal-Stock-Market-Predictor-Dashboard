@@ -18,6 +18,7 @@ function _computeChartColors() {
     amber: get("--amber", "#f5a623"),
     grid: get("--border", "rgba(11,46,79,0.08)"),
     text: get("--text-dim", "#6b7686"),
+    bg: get("--card-bg", "#ffffff"),
   };
 }
 
@@ -204,6 +205,8 @@ let _priceChartFullHistory = [];
 // hovered point, plus a small value badge on the y-axis. Chart.js has no
 // built-in crosshair, so this is a small custom plugin rather than pulling
 // in an extra dependency.
+const _pointY = (p) => (p !== null && typeof p === "object" ? p.y : p);
+
 const crosshairPlugin = {
   id: "crosshair",
   afterDraw(chart) {
@@ -240,8 +243,8 @@ const crosshairPlugin = {
       ctx.save();
       ctx.setLineDash([]);
       const isDown = point.$context && point.$context.dataIndex > 0 &&
-        chart.data.datasets[0].data[point.$context.dataIndex] <
-        chart.data.datasets[0].data[point.$context.dataIndex - 1];
+        _pointY(chart.data.datasets[0].data[point.$context.dataIndex]) <
+        _pointY(chart.data.datasets[0].data[point.$context.dataIndex - 1]);
       ctx.fillStyle = isDown ? CHART_COLORS.red : CHART_COLORS.green;
       const textWidth = ctx.measureText(label).width + 12;
       ctx.fillRect(chartArea.right, y - 9, textWidth, 18);
@@ -673,7 +676,10 @@ function _renderNavIndex(data) {
   if (chgEl) {
     const chg = idx.change == null ? "" : `${sign}${idx.change}`;
     const pct = idx.change_pct == null ? "" : `${arrow} ${sign}${idx.change_pct}%`;
-    chgEl.textContent = [chg, pct].filter(Boolean).join("  ");
+    // two parts so narrow laptop widths can drop the points and keep the %
+    chgEl.textContent = "";
+    if (chg) { const s1 = document.createElement("span"); s1.className = "nav-index-pts"; s1.textContent = chg; chgEl.append(s1, " "); }
+    if (pct) { const s2 = document.createElement("span"); s2.textContent = pct; chgEl.append(s2); }
   }
 }
 
@@ -818,6 +824,73 @@ function _trimTrailingFlat(series) {
   return series.slice(0, cutoff + 1);
 }
 
+// Draws a dashed line at the previous close and a value tag for the latest
+// point on the right axis -- the two reference marks ShareHub's 1D chart has.
+const _liveRefPlugin = {
+  id: "liveRef",
+  afterDatasetsDraw(chart, _args, opts) {
+    const { ctx, chartArea, scales: { y } } = chart;
+    if (!y) return;
+    const font = "600 11px -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    const tag = (value, bg, fg, dash) => {
+      if (!Number.isFinite(value)) return;
+      const py = y.getPixelForValue(value);
+      if (py < chartArea.top - 1 || py > chartArea.bottom + 1) return;
+      ctx.save();
+      ctx.setLineDash(dash);
+      ctx.strokeStyle = bg;
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, py);
+      ctx.lineTo(chartArea.right, py);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.setLineDash([]);
+      ctx.font = font;
+      const label = value.toFixed(2);
+      const w = ctx.measureText(label).width + 12;
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(chartArea.right + 2, py - 9, w, 18, 3) : ctx.rect(chartArea.right + 2, py - 9, w, 18);
+      ctx.fill();
+      ctx.fillStyle = fg;
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, chartArea.right + 8, py);
+      ctx.restore();
+    };
+    tag(opts.prevClose, CHART_COLORS.text, CHART_COLORS.bg || "#111", [2, 3]);   // previous close: dotted grey
+    const data = chart.data.datasets[0].data;
+    tag(_pointY(data[data.length - 1]), opts.lineColor, "#fff", [5, 4]);                 // latest value: dashed, like ShareHub
+  },
+};
+
+function _liveGradient(chart, rgb) {
+  const { ctx, chartArea } = chart;
+  if (!chartArea) return `rgba(${rgb},0.15)`;
+  const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+  g.addColorStop(0, `rgba(${rgb},0.38)`);
+  g.addColorStop(0.65, `rgba(${rgb},0.10)`);
+  g.addColorStop(1, `rgba(${rgb},0.0)`);
+  return g;
+}
+
+// NEPSE's regular session runs 11:00-15:00 Nepal Time (UTC+5:45). The x-axis
+// always spans that whole window, so mid-session the curve stops at "now"
+// with empty space to 3 PM, the way ShareHub draws it.
+const NPT_OFFSET_S = 5.75 * 3600;
+const SESSION_OPEN_H = 11, SESSION_CLOSE_H = 15;
+
+function _sessionWindow(unixSeconds) {
+  const nptMidnight = Math.floor((unixSeconds + NPT_OFFSET_S) / 86400) * 86400 - NPT_OFFSET_S;
+  return { open: nptMidnight + SESSION_OPEN_H * 3600, close: nptMidnight + SESSION_CLOSE_H * 3600 };
+}
+
+function _nptHourLabel(unixSeconds) {
+  const h = Math.round(((unixSeconds + NPT_OFFSET_S) % 86400) / 3600) % 24;
+  return `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+}
+
 function renderLiveIndexChart(rawSeries, indexInfo) {
   const wrap = document.getElementById("live-chart-wrap");
   const ctx = document.getElementById("live-index-chart");
@@ -827,7 +900,10 @@ function renderLiveIndexChart(rawSeries, indexInfo) {
     wrap.style.display = "none";
     return;
   }
-  const series = _trimTrailingFlat(rawSeries);
+  const win = _sessionWindow(rawSeries[rawSeries.length - 1].t);
+  // drop pre-open / after-close ticks so the curve lives inside 11 AM - 3 PM
+  const inSession = rawSeries.filter(p => p.t >= win.open && p.t <= win.close);
+  const series = _trimTrailingFlat(inSession.length >= 2 ? inSession : rawSeries);
   wrap.style.display = "";
 
   // Colour the curve by the day's direction, like ShareHub does.
@@ -835,46 +911,104 @@ function renderLiveIndexChart(rawSeries, indexInfo) {
     ? indexInfo.change_pct < 0
     : series[series.length - 1].v < series[0].v;
   const line = down ? CHART_COLORS.red : CHART_COLORS.green;
-  const fill = down ? "rgba(220,38,38,0.10)" : "rgba(22,163,74,0.10)";
+  const rgb = down ? "220,38,38" : "22,163,74";
+  const prevClose = (indexInfo && indexInfo.value != null && indexInfo.change != null)
+    ? indexInfo.value - indexInfo.change : null;
 
+  const points = series.map(p => ({ x: p.t, y: p.v }));
+  const values = series.map(p => p.v);
+
+  // Each 60s poll updates the existing chart in place instead of destroying
+  // and rebuilding it, so the line extends smoothly without a flash.
+  if (_liveIndexChart && _liveIndexChart.canvas === ctx && _liveIndexChart.$down === down
+      && _liveIndexChart.$phone === _isPhone()) {
+    _liveIndexChart.data.datasets[0].data = points;
+    _liveIndexChart.options.scales.x.min = win.open;
+    _liveIndexChart.options.scales.x.max = win.close;
+    _liveIndexChart.options.plugins.liveRef.prevClose = prevClose;
+    _liveIndexChart.update("none");
+    return;
+  }
   if (_liveIndexChart) _liveIndexChart.destroy();
+
+  // keep the previous-close line in view when it sits just outside the day's range
+  let suggestedMin, suggestedMax;
+  if (prevClose != null) {
+    suggestedMin = Math.min(...values, prevClose);
+    suggestedMax = Math.max(...values, prevClose);
+  }
 
   _liveIndexChart = new Chart(ctx, {
     type: "line",
     data: {
-      labels: series.map(p => _nptTime(p.t)),
       datasets: [{
         label: "NEPSE Index",
-        data: series.map(p => p.v),
+        data: points,
         borderColor: line,
-        backgroundColor: fill,
-        borderWidth: 1.5,
-        fill: true,
-        tension: 0.1,
+        backgroundColor: (c) => _liveGradient(c.chart, rgb),
+        borderWidth: 2,
+        fill: "start",
+        cubicInterpolationMode: "monotone",   // smooth curve that never overshoots the data
         pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: line,
         pointHitRadius: 10,
+        borderCapStyle: "round",
+        borderJoinStyle: "round",
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: false,          // avoid a redraw flicker on each 60s poll
-      interaction: { mode: "index", intersect: false },
+      animation: false,          // no redraw flicker on each 60s poll
+      layout: { padding: { right: 4, top: 6 } },
+      interaction: { mode: "nearest", axis: "x", intersect: false },
       plugins: {
         legend: { display: false },
+        liveRef: { prevClose, lineColor: line },
         tooltip: {
+          displayColors: false,
           callbacks: {
-            label: (item) => `Index  ${item.parsed.y.toFixed(2)}`,
+            title: (items) => _nptTime(items[0].parsed.x) + " NPT",
+            label: (item) => {
+              const v = item.parsed.y;
+              if (prevClose == null) return `Index ${v.toFixed(2)}`;
+              const d = v - prevClose;
+              return `Index ${v.toFixed(2)}  (${d >= 0 ? "+" : ""}${d.toFixed(2)})`;
+            },
           },
         },
       },
       scales: {
-        x: { ticks: { maxTicksLimit: _isPhone() ? 4 : 6, autoSkip: true, maxRotation: 0 } },
-        y: { position: "right", ticks: { maxTicksLimit: _isPhone() ? 5 : 6 } },
+        x: {
+          type: "linear",
+          min: win.open,
+          max: win.close,
+          grid: { display: false },
+          border: { display: false },
+          // one tick per hour: 11 AM, 12 PM, 1 PM, 2 PM, 3 PM
+          afterBuildTicks: (scale) => {
+            scale.ticks = [];
+            for (let t = scale.min; t <= scale.max; t += 3600) scale.ticks.push({ value: t });
+          },
+          ticks: { maxRotation: 0, padding: 6, autoSkip: false, callback: (v) => _nptHourLabel(v) },
+        },
+        y: {
+          position: "right",
+          suggestedMin, suggestedMax,
+          grace: "6%",
+          border: { display: false },
+          grid: { color: CHART_COLORS.grid, drawTicks: false },
+          ticks: { maxTicksLimit: _isPhone() ? 5 : 6, padding: 8, callback: (v) => Number(v).toFixed(0) },
+          afterFit: (scale) => { scale.width = Math.max(scale.width, 58); },  // room for the value tags
+        },
       },
     },
-    plugins: [crosshairPlugin],
+    plugins: [crosshairPlugin, _liveRefPlugin],
   });
+  _liveIndexChart.$down = down;
+  _liveIndexChart.$phone = _isPhone();
+  _registerThemeRedraw("liveIndex", () => { if (_liveIndexChart) { _liveIndexChart.destroy(); _liveIndexChart = null; } renderLiveIndexChart(rawSeries, indexInfo); });
 }
 
 // --- Live quote on the stock detail page -----------------------------------
@@ -992,15 +1126,17 @@ function renderSubIndices(rows) {
   </table>`;
 }
 
-// --- Navbar ticker search ---------------------------------------------------
+// --- Ticker search (navbar, watchlist, portfolio) ------------------------------
 // A custom autocomplete rather than a native <datalist>: browsers dump every
-// option on focus, which meant all 260 tickers appeared before typing a
-// character. This only renders after input and caps the list.
+// option on focus, which meant all ~270 tickers appeared before typing a
+// character. This renders a short, ranked list as you type; on an empty
+// field it shows your last 5 searches and (signed in) a few stock ideas.
 
 const NAV_SEARCH_LIMIT = 8;
+const SEARCH_HISTORY_SHOWN = 5;
+const _LOCAL_HISTORY_KEY = "nepse-search-history";
 let _tickerIndex = null;      // [{t, n}], fetched once
 let _tickerIndexPromise = null;
-let _navSearchActive = -1;    // highlighted row for keyboard nav
 
 async function _loadTickerIndex() {
   if (_tickerIndex) return _tickerIndex;
@@ -1016,50 +1152,231 @@ async function _loadTickerIndex() {
 function _matchTickers(query) {
   const q = (query || "").trim().toLowerCase();
   if (!q || !_tickerIndex) return [];
-  const starts = [], contains = [];
+  // exact symbol first, then symbol prefix, then name prefix / word prefix, then substring
+  // (a symbol prefix that is also the company's first word -- "nab" -> NABIL,
+  // Nabil Bank -- outranks a symbol-only prefix like NABBC)
+  const buckets = [[], [], [], [], []];
   for (const row of _tickerIndex) {
     const t = row.t.toLowerCase();
     const n = (row.n || "").toLowerCase();
-    if (t.startsWith(q) || n.startsWith(q)) starts.push(row);
-    else if (t.includes(q) || n.includes(q)) contains.push(row);
-    if (starts.length >= NAV_SEARCH_LIMIT) break;
+    const namePrefix = n.startsWith(q);
+    if (t === q) buckets[0].push(row);
+    else if (t.startsWith(q) && namePrefix) buckets[1].push(row);
+    else if (t.startsWith(q)) buckets[2].push(row);
+    else if (namePrefix || n.includes(" " + q)) buckets[3].push(row);
+    else if (t.includes(q) || n.includes(q)) buckets[4].push(row);
   }
-  return starts.concat(contains).slice(0, NAV_SEARCH_LIMIT);
+  return buckets.flat().slice(0, NAV_SEARCH_LIMIT);
 }
 
 function _escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, ch => (
+  return String(s ?? "").replace(/[&<>"']/g, ch => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
   ));
 }
 
-function _renderNavResults(rows) {
-  const box = document.getElementById("nav-search-results");
-  const input = document.getElementById("nav-search-input");
-  if (!box) return;
-
-  if (!rows.length) {
-    box.innerHTML = "";
-    box.classList.remove("open");
-    if (input) input.setAttribute("aria-expanded", "false");
-    return;
-  }
-  box.innerHTML = rows.map((r, i) => `
-    <div class="nav-search-item${i === _navSearchActive ? " active" : ""}"
-         role="option" data-ticker="${_escapeHTML(r.t)}" data-index="${i}">
-      <span class="sym">${_escapeHTML(r.t)}</span>
-      <span class="nm">${_escapeHTML(r.n || "")}</span>
-    </div>`).join("");
-  box.classList.add("open");
-  if (input) input.setAttribute("aria-expanded", "true");
+function _highlight(text, q) {
+  const s = String(text || "");
+  const i = q ? s.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (i < 0) return _escapeHTML(s);
+  return _escapeHTML(s.slice(0, i)) + "<mark>" + _escapeHTML(s.slice(i, i + q.length)) + "</mark>"
+    + _escapeHTML(s.slice(i + q.length));
 }
 
-function _closeNavResults() {
-  const box = document.getElementById("nav-search-results");
-  const input = document.getElementById("nav-search-input");
-  _navSearchActive = -1;
-  if (box) { box.innerHTML = ""; box.classList.remove("open"); }
-  if (input) input.setAttribute("aria-expanded", "false");
+const _metaContent = (name) => (document.querySelector(`meta[name="${name}"]`) || {}).content || "";
+const _isSignedIn = () => _metaContent("signed-in") === "1";
+
+// Search history: kept on the server for signed-in users (so it follows them
+// across devices and feeds their stock ideas), in this browser otherwise.
+function _localHistory() {
+  try { return JSON.parse(localStorage.getItem(_LOCAL_HISTORY_KEY) || "[]").slice(0, SEARCH_HISTORY_SHOWN); }
+  catch (e) { return []; }
+}
+function _saveLocalHistory(rows) {
+  try { localStorage.setItem(_LOCAL_HISTORY_KEY, JSON.stringify(rows.slice(0, SEARCH_HISTORY_SHOWN))); } catch (e) { /* storage off */ }
+}
+
+let _historyCache = null;
+async function _loadHistory() {
+  if (_historyCache) return _historyCache;
+  if (_isSignedIn()) {
+    try {
+      const r = await fetch("/api/me/search-history", { credentials: "same-origin" });
+      const d = await r.json();
+      if (d.ok) { _historyCache = d.items; return _historyCache; }
+    } catch (e) { /* fall back to local */ }
+  }
+  _historyCache = _localHistory();
+  return _historyCache;
+}
+
+function _recordSearch(row) {
+  const next = [row, ...(_historyCache || _localHistory()).filter(h => h.t !== row.t)].slice(0, SEARCH_HISTORY_SHOWN);
+  _historyCache = next;
+  _saveLocalHistory(next);
+  if (_isSignedIn()) {
+    // keepalive lets the request finish while the page navigates away
+    fetch("/api/me/search-history", {
+      method: "POST", keepalive: true, credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": _metaContent("csrf-token") },
+      body: JSON.stringify({ ticker: row.t }),
+    }).catch(() => {});
+  }
+}
+
+async function _clearHistory() {
+  _historyCache = [];
+  _saveLocalHistory([]);
+  if (_isSignedIn()) {
+    try {
+      await fetch("/api/me/search-history", {
+        method: "DELETE", credentials: "same-origin", headers: { "X-CSRF-Token": _metaContent("csrf-token") },
+      });
+    } catch (e) { /* already cleared locally */ }
+  }
+}
+
+let _ideasPromise = null;
+function _loadIdeas() {
+  if (!_isSignedIn()) return Promise.resolve([]);
+  if (!_ideasPromise) {
+    _ideasPromise = fetch("/api/me/recommendations?limit=3", { credentials: "same-origin" })
+      .then(r => r.json()).then(d => (d.ok ? d.items : [])).catch(() => []);
+  }
+  return _ideasPromise;
+}
+
+/**
+ * Attach the autocomplete to an <input> and its results <div>.
+ * opts.onPick(row)       called with {t, n} when a symbol is chosen
+ * opts.showHistory       show recent searches + ideas on an empty field
+ * opts.record            save picks to the search history
+ */
+function attachTickerSearch(input, box, opts = {}) {
+  if (!input || !box || input.dataset.tsReady) return;
+  input.dataset.tsReady = "1";
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-expanded", "false");
+  if (box.id) input.setAttribute("aria-controls", box.id);
+  box.setAttribute("role", "listbox");
+
+  let rows = [];        // rows currently selectable, in display order
+  let active = -1;
+  let timer = null;
+  let seq = 0;          // drops stale async renders
+
+  const open = () => { box.classList.add("open"); input.setAttribute("aria-expanded", "true"); };
+  const close = () => {
+    box.classList.remove("open");
+    input.setAttribute("aria-expanded", "false");
+    active = -1;
+  };
+
+  const item = (r, i, q, extra = "") => `
+    <div class="nav-search-item${i === active ? " active" : ""}" role="option" id="${box.id || "ts"}-opt-${i}"
+         aria-selected="${i === active}" data-index="${i}">
+      <span class="sym">${_highlight(r.t, q)}</span>
+      <span class="nm">${_highlight(r.n || "", q)}</span>${extra}
+    </div>`;
+
+  function paintActive() {
+    box.querySelectorAll(".nav-search-item").forEach((el) => {
+      const on = Number(el.dataset.index) === active;
+      el.classList.toggle("active", on);
+      el.setAttribute("aria-selected", on ? "true" : "false");
+      if (on) el.scrollIntoView({ block: "nearest" });
+    });
+    input.setAttribute("aria-activedescendant", active >= 0 ? `${box.id || "ts"}-opt-${active}` : "");
+  }
+
+  async function renderEmpty() {
+    if (!opts.showHistory) { close(); return; }
+    const my = ++seq;
+    const [hist, ideas] = await Promise.all([_loadHistory(), _loadIdeas()]);
+    if (my !== seq || input.value.trim()) return;
+    rows = [];
+    let html = "";
+    if (hist.length) {
+      html += `<div class="ts-head"><span>Recent searches</span><button type="button" class="ts-clear" data-clear>Clear</button></div>`;
+      html += hist.map(h => { rows.push(h); return item(h, rows.length - 1, "", `<span class="ts-ico" aria-hidden="true">↺</span>`); }).join("");
+    }
+    if (ideas.length) {
+      html += `<div class="ts-head"><span>Ideas for you</span><a href="/portfolio#ideas" class="ts-clear">See why</a></div>`;
+      html += ideas.map(r => {
+        const row = { t: r.ticker, n: r.name };
+        rows.push(row);
+        const cls = r.forecast_pct >= 0 ? "pos" : "neg";
+        return item(row, rows.length - 1, "", `<span class="ts-tag ${cls}">${r.forecast_pct > 0 ? "+" : ""}${r.forecast_pct}%</span>`);
+      }).join("");
+    }
+    if (!html) { close(); return; }
+    box.innerHTML = html;
+    open();
+  }
+
+  async function renderQuery() {
+    const q = input.value.trim();
+    if (!q) { renderEmpty(); return; }
+    const my = ++seq;
+    await _loadTickerIndex();
+    if (my !== seq) return;
+    rows = _matchTickers(q);
+    active = rows.length ? 0 : -1;   // Enter picks the best match
+    box.innerHTML = rows.length
+      ? rows.map((r, i) => item(r, i, q)).join("")
+      : `<div class="ts-empty">No symbol or company matches “${_escapeHTML(q)}”.</div>`;
+    open();
+    paintActive();
+  }
+
+  function pick(row) {
+    if (!row) return;
+    if (opts.record) _recordSearch(row);
+    close();
+    if (opts.onPick) opts.onPick(row);
+  }
+
+  input.addEventListener("focus", () => { _loadTickerIndex(); if (!input.value.trim()) renderEmpty(); });
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(renderQuery, 60);   // light debounce: smooth while typing fast
+  });
+  input.addEventListener("keydown", (e) => {
+    const isOpen = box.classList.contains("open");
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!isOpen) { input.value.trim() ? renderQuery() : renderEmpty(); return; }
+      if (rows.length) { active = (active + 1) % rows.length; paintActive(); }
+    } else if (e.key === "ArrowUp" && isOpen && rows.length) {
+      e.preventDefault();
+      active = active <= 0 ? rows.length - 1 : active - 1;
+      paintActive();
+    } else if (e.key === "Enter" && isOpen && active >= 0 && rows[active]) {
+      e.preventDefault();
+      pick(rows[active]);
+    } else if (e.key === "Escape") {
+      close();
+    }
+  });
+  box.addEventListener("mousedown", async (e) => {
+    // mousedown, not click -- blur would close the list first
+    if (e.target.closest("[data-clear]")) {
+      e.preventDefault();
+      await _clearHistory();
+      renderEmpty();
+      return;
+    }
+    if (e.target.closest("a")) return;
+    const el = e.target.closest(".nav-search-item");
+    if (el) { e.preventDefault(); pick(rows[Number(el.dataset.index)]); }
+  });
+  box.addEventListener("mousemove", (e) => {
+    const el = e.target.closest(".nav-search-item");
+    if (el && Number(el.dataset.index) !== active) { active = Number(el.dataset.index); paintActive(); }
+  });
+  input.addEventListener("blur", () => setTimeout(close, 120));
 }
 
 function _gotoTicker(ticker) {
@@ -1071,51 +1388,14 @@ function wireNavSearch() {
   const input = document.getElementById("nav-search-input");
   const box = document.getElementById("nav-search-results");
   if (!form || !input || !box) return;
-
-  // warm the index on focus so the first keystroke already has data
-  input.addEventListener("focus", _loadTickerIndex);
-
-  input.addEventListener("input", async () => {
-    await _loadTickerIndex();
-    _navSearchActive = -1;
-    _renderNavResults(_matchTickers(input.value));
-  });
-
-  input.addEventListener("keydown", (e) => {
-    const rows = box.querySelectorAll(".nav-search-item");
-    if (e.key === "ArrowDown" && rows.length) {
-      e.preventDefault();
-      _navSearchActive = Math.min(_navSearchActive + 1, rows.length - 1);
-      _renderNavResults(_matchTickers(input.value));
-    } else if (e.key === "ArrowUp" && rows.length) {
-      e.preventDefault();
-      _navSearchActive = Math.max(_navSearchActive - 1, 0);
-      _renderNavResults(_matchTickers(input.value));
-    } else if (e.key === "Escape") {
-      _closeNavResults();
-    }
-  });
-
-  box.addEventListener("mousedown", (e) => {
-    // mousedown, not click -- blur would close the list first
-    const item = e.target.closest(".nav-search-item");
-    if (item) { e.preventDefault(); _gotoTicker(item.dataset.ticker); }
-  });
-
-  form.addEventListener("submit", (e) => {
+  attachTickerSearch(input, box, { showHistory: true, record: true, onPick: (r) => _gotoTicker(r.t) });
+  form.addEventListener("submit", async (e) => {
+    // Enter with the list closed (or no match): best effort
     e.preventDefault();
-    const matches = _matchTickers(input.value);
-    if (_navSearchActive >= 0 && matches[_navSearchActive]) {
-      _gotoTicker(matches[_navSearchActive].t);
-    } else if (matches.length) {
-      _gotoTicker(matches[0].t);          // best match on plain Enter
-    } else if (input.value.trim()) {
-      _gotoTicker(input.value.trim().toUpperCase());
-    }
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!form.contains(e.target)) _closeNavResults();
+    await _loadTickerIndex();
+    const best = _matchTickers(input.value)[0];
+    if (best) { _recordSearch(best); _gotoTicker(best.t); }
+    else if (input.value.trim()) _gotoTicker(input.value.trim().toUpperCase());
   });
 }
 

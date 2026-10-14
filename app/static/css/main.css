@@ -527,6 +527,12 @@ button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-of
   z-index: 1050;
 }
 .nav-search-results.open { display: block; }
+/* Fade/slide the dropdown instead of popping it in */
+.nav-search-results { display: block; opacity: 0; visibility: hidden; transform: translateY(-4px);
+  transition: opacity .14s ease, transform .14s ease, visibility 0s linear .14s; overscroll-behavior: contain; }
+.nav-search-results.open { opacity: 1; visibility: visible; transform: none;
+  transition: opacity .14s ease, transform .14s ease, visibility 0s; }
+@media (prefers-reduced-motion: reduce) { .nav-search-results, .nav-search-results.open { transition: none; } }
 .nav-search-item {
   padding: 7px 12px;
   cursor: pointer;
@@ -750,4 +756,97 @@ table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: 
   .forecast-chart { min-height: 400px; }
   .quote-header h1 { font-size: 1.7rem; }
   .stat-tile.sm .value { font-size: 1.05rem; }
+}
+
+
+/* ===== Ticker search: sections, highlight, pickers ===== */
+.nav-search-item { transition: background-color .08s ease; }
+.nav-search-item mark { background: transparent; color: inherit; font-weight: 800; padding: 0; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 2px; }
+.nav-search-item .ts-ico { margin-left: auto; color: var(--text-dim); font-size: .8rem; }
+.ts-tag { margin-left: auto; font-size: .72rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--neutral-bg); white-space: nowrap; }
+.ts-tag.pos { color: var(--green); background: rgba(22,163,74,.10); }
+.ts-tag.neg { color: var(--red); background: rgba(220,38,38,.10); }
+.ts-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 4px;
+  font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+.ts-head + .nav-search-item { border-top: none; }
+.ts-clear { background: none; border: 0; padding: 0; color: var(--accent); font-size: .7rem; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }
+.ts-empty { padding: 12px; font-size: .82rem; color: var(--text-dim); }
+.ts-wrap { position: relative; flex: 1 1 260px; max-width: 380px; }
+.ts-wrap input { width: 100% !important; max-width: none !important; }
+.ts-wrap .ts-results { top: calc(100% + 4px); width: 100%; min-width: 260px; max-height: 320px; }
+.modal .ts-wrap { max-width: none; }
+
+/* ===== Portfolio tabs ===== */
+.pf-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 4px 0 16px; overflow-x: auto; }
+.pf-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 8px 16px; font: inherit; font-weight: 600; font-size: .9rem; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.pf-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.pf-tabs button:hover { color: var(--text); }
+.pf-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.fc-help { font-size: .78rem; margin: -4px 0 10px; }
+.fc-pick { width: auto; min-width: 150px; font-size: .8rem; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.fc-path-meta { font-size: .84rem; margin-bottom: 8px; min-height: 1.3em; }
+.fc-table tbody tr { cursor: pointer; }
+.fc-table td, .fc-table th { white-space: nowrap; }
+.stat-tile .value small { font-size: .7em; font-weight: 600; }
+
+/* ===== Stock ideas ===== */
+.ideas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.idea-card { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; background: var(--card-bg); display: flex; flex-direction: column; gap: 2px; }
+.idea-top { display: flex; align-items: center; gap: 8px; }
+.idea-sym { font-weight: 800; font-size: 1.05rem; }
+.idea-name { font-size: .84rem; }
+.idea-sector { font-size: .74rem; }
+.idea-why { margin: 8px 0 10px; padding-left: 18px; font-size: .78rem; color: var(--text-dim); }
+.idea-why li { margin-bottom: 2px; }
+.idea-actions { display: flex; gap: 8px; margin-top: auto; }
+
+@media (max-width: 640px) {
+  .ts-wrap { max-width: none; flex-basis: 100%; }
+  .pf-tabs button { padding: 8px 12px; flex: 1; }
+  .ideas-grid { grid-template-columns: 1fr; }
+  .chart-box#fc-range-box { min-height: 180px; }
+}
+#live-chart-wrap .chart-box { height: 340px; }
+@media (max-width: 640px) { #live-chart-wrap .chart-box { height: 300px; } }
+
+/* Laptop widths: fit the whole nav (search, NEPSE index pill, links, theme,
+   user) on one row by tightening spacing instead of hiding the index pill. */
+@media (min-width: 992px) and (max-width: 1599.98px) {
+  .nav-search { margin-left: 14px; margin-right: 10px; }
+  .nav-search input { width: 180px; }
+  .nav-index { padding: 4px 11px; gap: 6px; font-size: .8rem; margin-right: 12px !important; }
+  .navbar .ms-auto { gap: 12px !important; }
+}
+@media (min-width: 992px) and (max-width: 1439.98px) {
+  .nav-search input { width: 160px; }
+  .nav-index-pts { display: none; }               /* keep the % change, drop the points */
+}
+@media (min-width: 992px) and (max-width: 1279.98px) {
+  .nav-search input { width: 130px; }
+  .navbar .ms-auto { gap: 9px !important; }
+  .navbar .nav-link { padding-left: 2px; padding-right: 2px; font-size: .9rem; }
+  .user-chip { max-width: 34px; padding: 3px; }   /* avatar only */
+}
+@media (min-width: 992px) and (max-width: 1099.98px) {
+  .navbar-brand { font-size: 1.05rem; margin-right: 0; }
+  .nav-index-name { display: none; }              /* dot + value + % is enough here */
+  .nav-search { margin-left: 10px; }
+  .nav-index { margin-right: 8px !important; }
+}
+
+/* Forecast tab: breathing room between the chart cards and the table, and roomier rows */
+#pf-forecast > .row { margin-bottom: 22px; }
+#pf-forecast > .row > [class*="col-"] > .card-panel { margin-bottom: 0; }
+#pf-forecast .card-panel { padding: 22px 24px; }
+#pf-forecast .card-panel h3 { margin-bottom: 16px; }
+.fc-table th, .fc-table td { padding: 13px 16px; }
+.fc-table thead th { padding-top: 6px; padding-bottom: 12px; }
+.fc-table tfoot td { padding-top: 15px; }
+#fc-foot { margin-top: 14px !important; line-height: 1.6; }
+@media (max-width: 640px) {
+  #pf-forecast > .row { margin-bottom: 16px; }
+  #pf-forecast > .row.g-3 { --bs-gutter-y: 16px; }
+  #pf-forecast .card-panel { padding: 16px 14px; }
+  .fc-table th, .fc-table td { padding: 11px 10px; }
 }
