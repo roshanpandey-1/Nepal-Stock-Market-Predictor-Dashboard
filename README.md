@@ -79,11 +79,7 @@ python examples/fetch_stock_data.py
 python run.py                     # → http://localhost:5000
 ```
 
-**Run the dashboard without the full dataset:** the repo ships a trimmed snapshot used by the live deployment.
-
-```bash
-DATA_DIR=deploy_data python run.py
-```
+`python run.py` reads the trimmed `deploy_data/` snapshot, the same data the live site uses, so local and live match. It also works without the full dataset. To browse your full local dataset instead, set `DATA_DIR=data` first (PowerShell: `$env:DATA_DIR="data"; python run.py`).
 
 ### Other entry points
 

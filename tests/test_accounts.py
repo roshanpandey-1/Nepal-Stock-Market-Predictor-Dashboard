@@ -328,3 +328,25 @@ def test_portfolio_api_reports_todays_change(client):
     d = client.get("/api/me/portfolio").get_json()
     assert d["totals"]["day_pl"] == 50.0          # 5 shares x +10 vs previous close
     assert d["holdings"][0]["change_pct"] == 1.01
+
+
+def _run_py_data_dir(monkeypatch, tmp_path, preset):
+    """Import run.py fresh and report which data folder the app resolved."""
+    import importlib, sys
+    for m in [m for m in sys.modules if m == "run" or m == "app" or m.startswith("app.")]:
+        monkeypatch.delitem(sys.modules, m)
+    if preset is None:
+        monkeypatch.delenv("DATA_DIR", raising=False)
+    else:
+        monkeypatch.setenv("DATA_DIR", preset)
+    monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "t.db"))
+    importlib.import_module("run")
+    return sys.modules["app.api"].DATA_DIR.as_posix()
+
+
+def test_run_py_defaults_to_the_deployed_snapshot(monkeypatch, tmp_path):
+    assert _run_py_data_dir(monkeypatch, tmp_path, None) == "deploy_data"
+
+
+def test_run_py_respects_an_explicit_data_dir(monkeypatch, tmp_path):
+    assert _run_py_data_dir(monkeypatch, tmp_path, "data") == "data"
