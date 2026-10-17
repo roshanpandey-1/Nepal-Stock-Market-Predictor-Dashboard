@@ -12,7 +12,7 @@
 
 > Hosted on Render's free tier, which sleeps after 15 minutes of inactivity — the first request may take ~50 seconds to wake the instance.
 
-![NEPSE Intelligence dashboard](app/static/images/dashboard_preview.png)
+![NEPSE Intelligence dashboard](app/frontend/static/images/dashboard_preview.png)
 
 ---
 
@@ -148,25 +148,42 @@ Render redeploys automatically on every push.
 
 ## 📁 Project Structure
 
+The repo splits into four parts. The folder names `app/`, `src/`, `config/`, `data/` and `deploy_data/` are used by imports, Render and the GitHub Actions workflows, so they keep their names.
+
+| Part | Where it lives | What is in it |
+|---|---|---|
+| **Frontend** | `app/frontend/` | `templates/` (Jinja2 pages) and `static/` (CSS, Chart.js and Plotly code, images) |
+| **Backend** | `app/*.py`, `run.py` | Flask routes, JSON API, accounts and portfolio logic, database models, e-mail, ideas and forecasts |
+| **Models and ML** | `src/`, `config/`, `examples/`, `notebooks/` | Scrapers, feature engineering, sector trainers (LSTM / XGBoost), sentiment, backtesting, and the runnable pipeline scripts |
+| **Data** | `data/`, `deploy_data/` | `data/` is the full dataset (gitignored); `deploy_data/` is the trimmed snapshot the live site reads |
+
 ```
 .
-├── app/                      # Flask dashboard
+├── app/
+│   ├── frontend/
+│   │   ├── templates/        # Jinja2 pages
+│   │   └── static/           # CSS, JS, images
+│   ├── __init__.py           # App factory, /healthz
 │   ├── routes.py             # Page routes, market movers, caching
-│   ├── api.py                # JSON API — live model inference
-│   ├── templates/            # Jinja2 pages
-│   └── static/               # CSS, Chart.js logic
+│   ├── api.py                # JSON API: live model inference
+│   ├── accounts.py           # Sign-in, watchlist, portfolio, search history
+│   ├── insights.py           # Ideas to research, holdings forecast
+│   ├── models.py             # Database tables
+│   ├── portfolio_utils.py    # Holding valuation and today's change
+│   ├── news_utils.py  mailer.py
 ├── src/
-│   ├── scraper/              # NEPSE price & news scrapers
-│   ├── features/             # Technical indicators & labeling
+│   ├── scraper/              # NEPSE price and news scrapers
+│   ├── features/             # Technical indicators and labeling
 │   ├── nlp/                  # FinBERT sentiment pipeline
-│   ├── models/               # Sector trainer (LSTM / XGBoost)
-│   └── backtesting/          # Strategy simulation & metrics
-├── data/                     # Full dataset (gitignored)
-│   ├── raw/  processed/  models/  news/
-├── deploy_data/              # Trimmed snapshot committed for deployment
-├── examples/                 # Runnable pipeline scripts
-├── tests/                    # 23 unit tests
+│   ├── models/               # Sector trainers and forecaster
+│   └── backtesting/          # Strategy simulation and metrics
 ├── config/                   # YAML configuration
+├── examples/                 # Runnable pipeline scripts (also used by GitHub Actions)
+├── notebooks/                # Experiments
+├── data/                     # Full dataset (gitignored)
+├── deploy_data/              # Trimmed snapshot committed for deployment
+├── tests/                    # pytest suite
+├── .github/workflows/        # Scheduled data, model and backtest jobs
 ├── render.yaml               # Render Blueprint (deployment)
 └── run.py                    # App entry point
 ```

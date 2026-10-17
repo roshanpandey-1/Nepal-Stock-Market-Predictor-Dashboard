@@ -29,7 +29,10 @@ def _database_uri():
 
 
 def create_app(test_config=None):
-    app = Flask(__name__)
+    # Pages and assets live in app/frontend so the browser side is one folder.
+    # static_url_path stays "/static", so every URL on the site is unchanged.
+    app = Flask(__name__, template_folder="frontend/templates",
+                static_folder="frontend/static", static_url_path="/static")
 
     secret = os.environ.get("SECRET_KEY")
     if not secret:
