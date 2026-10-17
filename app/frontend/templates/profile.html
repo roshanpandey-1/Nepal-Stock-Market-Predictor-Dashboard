@@ -46,8 +46,8 @@
       <form method="post" class="d-flex flex-wrap gap-2 align-items-end" novalidate>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="action" value="delete">
-        <label class="field mb-0" style="min-width:260px;"><span>Type <code>{{ user.email }}</code> to confirm</span>
-          <input type="text" name="confirm_email" autocomplete="off">
+        <label class="field mb-0" style="min-width:260px;"><span>Type <code>CONFIRM</code> to delete</span>
+          <input type="text" name="confirm_word" placeholder="CONFIRM" autocomplete="off" autocapitalize="characters" spellcheck="false">
         </label>
         <button class="btn-danger-nepse" type="submit">Delete my account</button>
       </form>

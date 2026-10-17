@@ -176,10 +176,18 @@ def test_delete_account_removes_everything(client):
     _signup(client)
     _j(client, "post", "/api/me/holdings", {"ticker": "NABIL", "quantity": 10})
     _j(client, "post", "/api/me/watchlist", {"ticker": "SCB"})
-    r = client.post("/profile", data={"action": "delete", "confirm_email": "a@gmail.com", "csrf_token": _token(client)})
+    r = client.post("/profile", data={"action": "delete", "confirm_word": "CONFIRM", "csrf_token": _token(client)})
     assert r.status_code == 200
     from app.models import Holding, User, WatchlistItem
     assert User.query.count() == 0 and Holding.query.count() == 0 and WatchlistItem.query.count() == 0
+
+
+@pytest.mark.parametrize("typed", ["", "confirm", "CONFIRMED", "a@gmail.com", "yes"])
+def test_delete_account_needs_the_exact_word(client, typed):
+    _signup(client)
+    client.post("/profile", data={"action": "delete", "confirm_word": typed, "csrf_token": _token(client)})
+    from app.models import User
+    assert User.query.count() == 1
 
 
 def test_google_button_disabled_when_not_configured(client):

@@ -37,6 +37,7 @@ TICKER_RE = re.compile(r"^[A-Z0-9]{1,15}$")
 MAX_WATCHLIST = 100
 MAX_HOLDINGS = 500
 MAX_QTY = 10_000_000
+DELETE_CONFIRM_WORD = "CONFIRM"  # typed in the profile page to delete an account
 SEARCH_HISTORY_SHOWN = 5
 SEARCH_HISTORY_KEPT = 20  # older rows are pruned; extra ones feed the stock ideas
 MIN_PASSWORD = 8
@@ -410,8 +411,8 @@ def profile():
                 db.session.commit()
                 flash("Password updated.", "ok")
         elif action == "delete":
-            if (request.form.get("confirm_email") or "").strip().lower() != user.email:
-                flash("Type your email exactly to confirm deleting the account.", "error")
+            if (request.form.get("confirm_word") or "").strip() != DELETE_CONFIRM_WORD:
+                flash(f"Type {DELETE_CONFIRM_WORD} in capital letters to confirm deleting the account.", "error")
             else:
                 db.session.delete(user)
                 db.session.commit()
