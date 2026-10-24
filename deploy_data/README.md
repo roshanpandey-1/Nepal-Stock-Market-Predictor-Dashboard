@@ -1,20 +1,19 @@
 # deploy_data/
 
-A trimmed snapshot of `data/processed` and `data/models`,
-committed to git on purpose (unlike the full `data/` directories, which are
-gitignored) so the live dashboard has something to serve on a host that only
-has what's in this repo.
+A trimmed snapshot of `data/processed` and `data/models`, committed to git on purpose (unlike the full `data/`
+folder, which is gitignored) so the live dashboard has something to serve on a host that only has what is in
+this repo.
 
-- `processed/`: last ~260 rows per ticker (enough for the dashboard's 180-day
-  price chart and the LSTM's 10-day lookback window), not the full price
-  history back to each ticker's listing date.
-- `models/`: only the `*_oos` models (the out-of-sample ones actually used by
-  the dashboard's `/api/signal` endpoint) plus their scalers and split-date
-  files -- not every experimental model version in `data/models/`.
+- `processed/`: the last ~260 rows per stock (enough for the 180-day price chart and the LSTM's 10-day window),
+  not the full price history.
+- `models/`: the deployed `*_oos` sector models with their scalers and split dates, `retrain_report.csv` (the
+  holdout results behind the reliability tags), the 30-day price ranges (`forecast_summary.csv`,
+  `forecast_daily.csv`), the one-stock backtest summary, and the test results shown on the site
+  (`signal_evidence.json`, `forecast_evidence.json`).
 
-Regenerate this folder any time the underlying data/models are refreshed:
-    python examples/build_deploy_snapshot.py
+GitHub Actions keep this folder current. To rebuild it by hand from your full local `data/`:
 
-This folder is served when the app is started with `DATA_DIR=deploy_data`
-(see `render.yaml`); running `python run.py` locally with no env var set
-still uses the full `data/` directory as before.
+    python scripts/build_deploy_snapshot.py
+
+The app serves this folder by default (`python run.py`) and on Render (`DATA_DIR=deploy_data`). Set
+`DATA_DIR=data` to use the full local dataset instead.
