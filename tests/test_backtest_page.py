@@ -18,7 +18,8 @@ def make_client(tmp_path, monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
 
     def make(with_evidence):
-        from app import create_app, routes
+        from app import create_app
+        from app.backend import routes
         models = tmp_path / "models"
         models.mkdir(exist_ok=True)
         if with_evidence:

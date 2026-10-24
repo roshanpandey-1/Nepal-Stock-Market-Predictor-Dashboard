@@ -1,11 +1,11 @@
 """Tests for the Advancing / Declining / Unchanged lists behind the dashboard's
-breadth pills (src/scraper/live_market.py + /api/live/breadth/<bucket>)."""
+breadth pills (ml/scraper/live_market.py + /api/live/breadth/<bucket>)."""
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from unittest.mock import patch
 
-from src.scraper import live_market as lm
+from ml.scraper import live_market as lm
 
 LIVE_ROWS = [
     {"symbol": "AAA", "lastTradedPrice": 110, "previousClose": 100, "percentageChange": 10.0},  # duplicate row

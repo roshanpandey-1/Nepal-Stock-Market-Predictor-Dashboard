@@ -1,8 +1,8 @@
 """
-Tests for src/backtesting: metrics.py and backtester.py
+Tests for ml/backtesting: metrics.py and backtester.py
 These stay dependency-light (pure pandas/numpy) so they run without torch/
 xgboost installed -- the actual trained models are exercised end-to-end by
-examples/run_backtests_oos.py instead, which does need those.
+scripts/run_backtests_oos.py instead, which does need those.
 """
 import sys
 from pathlib import Path
@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtesting import metrics
+from ml.backtesting import metrics
 
 
 class TestMetrics:

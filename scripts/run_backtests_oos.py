@@ -5,7 +5,7 @@ which held out the last 3 months of data during training. This script runs the
 backtest ONLY over that holdout window, so the reported returns reflect signals
 the model generated on data it never trained on.
 
-Run: python examples/run_backtests_oos.py
+Run: python scripts/run_backtests_oos.py
 """
 import sys
 sys.path.append('.')
@@ -13,7 +13,7 @@ sys.path.append('.')
 import pickle
 import numpy as np
 import pandas as pd
-from src.backtesting.backtester import Backtester
+from ml.backtesting.backtester import Backtester
 
 try:
     import torch

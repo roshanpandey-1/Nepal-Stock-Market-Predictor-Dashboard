@@ -7,7 +7,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT))
-spec = importlib.util.spec_from_file_location("evaluate_signals_oos", ROOT / "examples" / "evaluate_signals_oos.py")
+spec = importlib.util.spec_from_file_location("evaluate_signals_oos", ROOT / "scripts" / "evaluate_signals_oos.py")
 ev = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ev)
 

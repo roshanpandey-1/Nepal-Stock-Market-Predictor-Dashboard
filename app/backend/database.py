@@ -1,7 +1,7 @@
 """Database models for user accounts, watchlists and portfolio transactions.
 
 Holdings are never stored: they are derived from the transaction log (see
-app/portfolio_utils.py), so editing or deleting a past transaction can never
+app/backend/portfolio_utils.py), so editing or deleting a past transaction can never
 leave a stale balance behind.
 """
 from datetime import datetime, timezone

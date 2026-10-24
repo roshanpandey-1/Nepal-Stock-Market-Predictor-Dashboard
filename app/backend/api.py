@@ -1,7 +1,7 @@
 """
 JSON API for the dashboard's charts and live signal lookups.
 
-All model inference here mirrors examples/run_backtests_oos.py: it loads the
+All model inference here mirrors scripts/run_backtests_oos.py: it loads the
 same *_oos LSTM/XGBoost models trained on a chronological 2-year window with
 the last 3 months held out, and applies them to a ticker's latest feature
 row(s). See README.md "Known limitation" section -- many sector models
@@ -75,7 +75,7 @@ def forecast(ticker):
 @api.route("/price-forecast/<ticker>")
 def price_forecast(ticker):
     """Precomputed Prophet forecast (fit on daily closes, data/models/forecast_*.csv,
-    built by examples/build_forecasts.py) for one ticker.
+    built by scripts/build_forecasts.py) for one ticker.
 
     This is a SEPARATE, independent signal from both /live/quote (today's
     actual traded price) and /signal (the sector LSTM/XGBoost Buy-Sell-Hold
@@ -338,7 +338,7 @@ def market_overview():
 def live_market():
     """Live NEPSE market snapshot (index, market status, top movers).
 
-    Served from a short TTL cache in src/scraper/live_market.py -- NEPSE is
+    Served from a short TTL cache in ml/scraper/live_market.py -- NEPSE is
     never called per page load. Always returns HTTP 200 with an `available`
     flag rather than an error status, so the dashboard can degrade quietly
     when NEPSE is unreachable (a real possibility from hosts outside Nepal).
@@ -348,7 +348,7 @@ def live_market():
     daily candles -- see README "Known limitation".
     """
     try:
-        from src.scraper.live_market import get_live_snapshot
+        from ml.scraper.live_market import get_live_snapshot
         snapshot = dict(get_live_snapshot())
         # per-ticker lookup is server-side only; all ~333 rows would bloat
         # every 60s poll for data the dashboard doesn't display
@@ -374,7 +374,7 @@ def live_breadth_list(bucket):
     /api/live, so no extra NEPSE call. Always 200 with an `available` flag."""
     bucket = (bucket or "").strip().lower()
     try:
-        from src.scraper.live_market import get_breadth_list
+        from ml.scraper.live_market import get_breadth_list
         result = get_breadth_list(bucket)
         if result is None:
             return jsonify({"available": False, "bucket": bucket,
@@ -396,7 +396,7 @@ def live_quote(ticker):
     """
     ticker = (ticker or "").strip().upper()
     try:
-        from src.scraper.live_market import get_live_quote
+        from ml.scraper.live_market import get_live_quote
         quote = get_live_quote(ticker)
         if not quote:
             return jsonify({"available": False, "ticker": ticker})
@@ -417,7 +417,7 @@ def tickers():
     Fetched once per page rather than inlined into every page's HTML.
     """
     try:
-        from app.routes import search_options
+        from app.backend.routes import search_options
         return jsonify(search_options())
     except Exception:
         return jsonify([])

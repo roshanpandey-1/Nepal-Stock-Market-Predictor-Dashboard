@@ -6,9 +6,9 @@ no history to update, forecast from, or retrain on. This script bundles them
 into one compressed archive, data-snapshot.tar.gz (~100 MB), which lives as an
 asset on a GitHub release tagged `data-latest` instead of inside git history.
 
-    python examples/data_snapshot.py pack      # data/ -> data-snapshot.tar.gz
-    python examples/data_snapshot.py unpack    # data-snapshot.tar.gz -> data/
-    python examples/data_snapshot.py check     # fail if the newest price row is too old
+    python scripts/data_snapshot.py pack      # data/ -> data-snapshot.tar.gz
+    python scripts/data_snapshot.py unpack    # data-snapshot.tar.gz -> data/
+    python scripts/data_snapshot.py check     # fail if the newest price row is too old
 
 First-time setup (once, from your machine): run `pack`, then create a GitHub
 release with tag `data-latest` and attach data-snapshot.tar.gz (web UI:

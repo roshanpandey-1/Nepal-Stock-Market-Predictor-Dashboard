@@ -64,8 +64,8 @@ def create_app(test_config=None):
         from werkzeug.middleware.proxy_fix import ProxyFix
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-    from app.routes import main
-    from app.api import api
+    from app.backend.routes import main
+    from app.backend.api import api
     app.register_blueprint(main)
     app.register_blueprint(api, url_prefix="/api")
 
@@ -82,8 +82,8 @@ def create_app(test_config=None):
 def _init_accounts(app):
     """Accounts are optional infrastructure: if anything here fails the public
     dashboard still starts and serves."""
-    from app.models import db
-    from app.accounts import acct
+    from app.backend.database import db
+    from app.backend.accounts import acct
     db.init_app(app)
     app.register_blueprint(acct)
 

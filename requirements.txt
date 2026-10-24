@@ -2,7 +2,7 @@
 # NEPSE's JSON API requires a token handshake; NepseUnofficialApi implements it.
 # NOTE: PyPI's `nepse` package shares this import name but has a different API
 # (todayPrice/isOpen vs. getLiveMarket/getTopGainers) and targets the retired
-# newweb.nepalstock.com.np domain -- src/scraper/ is written against this one.
+# newweb.nepalstock.com.np domain -- ml/scraper/ is written against this one.
 nepse @ git+https://github.com/basic-bgnr/NepseUnofficialApi
 requests==2.31.0
 beautifulsoup4==4.12.2
@@ -18,11 +18,8 @@ SQLAlchemy==2.0.23
 # Technical Analysis
 ta==0.11.0
 
-# NLP & Sentiment
-transformers==4.35.2
-torch==2.1.1
-
 # ML Models
+torch==2.1.1
 scikit-learn==1.3.2
 xgboost==2.0.2
 lightgbm==4.1.0

@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from app import insights
+from app.backend import insights
 from tests.test_accounts import _signup, _token, client  # noqa: F401  (fixture reuse)
 
 STATS = {
@@ -100,7 +100,7 @@ def test_search_history_needs_login_and_csrf(client):
 
 
 def test_search_history_caps_at_five_shown(client, monkeypatch):
-    from app import routes
+    from app.backend import routes
     names = [f"T{i}" for i in range(8)]
     monkeypatch.setattr(routes, "_ticker_list", lambda: names)
     _signup(client)

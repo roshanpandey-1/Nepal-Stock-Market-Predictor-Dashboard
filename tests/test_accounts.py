@@ -1,4 +1,4 @@
-"""Tests for user accounts, watchlist and portfolio (app/accounts.py, app/portfolio_utils.py)."""
+"""Tests for user accounts, watchlist and portfolio (app/backend/accounts.py, app/backend/portfolio_utils.py)."""
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from app.portfolio_utils import sector_breakdown, value_holdings
+from app.backend.portfolio_utils import sector_breakdown, value_holdings
 
 
 # ---------------- portfolio maths ----------------
@@ -35,7 +35,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
-    from app import create_app, routes
+    from app import create_app
+    from app.backend import routes
     monkeypatch.setattr(routes, "_ticker_list", lambda: ["NABIL", "SCB", "NLIC"])
     monkeypatch.setattr(routes, "_company_names", lambda: {"NABIL": "Nabil Bank", "SCB": "Standard Chartered"})
     monkeypatch.setattr(routes, "_ticker_sector", lambda t: {"NABIL": "Commercial Banks", "SCB": "Commercial Banks"}.get(t))
@@ -178,7 +179,7 @@ def test_delete_account_removes_everything(client):
     _j(client, "post", "/api/me/watchlist", {"ticker": "SCB"})
     r = client.post("/profile", data={"action": "delete", "confirm_word": "CONFIRM", "csrf_token": _token(client)})
     assert r.status_code == 200
-    from app.models import Holding, User, WatchlistItem
+    from app.backend.database import Holding, User, WatchlistItem
     assert User.query.count() == 0 and Holding.query.count() == 0 and WatchlistItem.query.count() == 0
 
 
@@ -186,7 +187,7 @@ def test_delete_account_removes_everything(client):
 def test_delete_account_needs_the_exact_word(client, typed):
     _signup(client)
     client.post("/profile", data={"action": "delete", "confirm_word": typed, "csrf_token": _token(client)})
-    from app.models import User
+    from app.backend.database import User
     assert User.query.count() == 1
 
 
@@ -238,7 +239,7 @@ def test_google_button_is_always_visible(client):
 @pytest.fixture
 def outbox(monkeypatch):
     sent = []
-    from app import accounts, mailer
+    from app.backend import accounts, mailer
     accounts._RESET_REQS.clear()
     monkeypatch.setattr(mailer, "send_email", lambda to, subject, text, html=None: sent.append((to, text)) or True)
     return sent
@@ -285,7 +286,7 @@ def test_forgot_password_is_rate_limited_and_bad_tokens_rejected(client, outbox)
 
 
 def test_mailer_posts_to_brevo_and_falls_back_to_logging(monkeypatch):
-    from app import mailer
+    from app.backend import mailer
     monkeypatch.delenv("BREVO_API_KEY", raising=False)
     assert mailer.send_email("x@gmail.com", "s", "t") is False        # not configured: logged only
     monkeypatch.setenv("BREVO_API_KEY", "k"); monkeypatch.setenv("MAIL_SENDER", "me@gmail.com")
@@ -341,7 +342,7 @@ def _run_py_data_dir(monkeypatch, tmp_path, preset):
         monkeypatch.setenv("DATA_DIR", preset)
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "t.db"))
     importlib.import_module("run")
-    return sys.modules["app.api"].DATA_DIR.as_posix()
+    return sys.modules["app.backend.api"].DATA_DIR.as_posix()
 
 
 def test_run_py_defaults_to_the_deployed_snapshot(monkeypatch, tmp_path):

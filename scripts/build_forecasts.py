@@ -9,8 +9,8 @@ route, a chart overlay, wherever) is a separate, deliberately deferred
 decision -- this script only produces the data.
 
 Usage:
-    python examples/build_forecasts.py
-    python examples/build_forecasts.py --periods 14 --min-rows 200
+    python scripts/build_forecasts.py
+    python scripts/build_forecasts.py --periods 14 --min-rows 200
 """
 import argparse
 import csv
@@ -21,7 +21,7 @@ from datetime import date
 sys.path.append('.')
 
 from loguru import logger
-from src.models.forecaster import StockForecaster
+from ml.models.forecaster import StockForecaster
 
 MIN_ROWS_DEFAULT = 100  # below this, a Prophet forecast is not meaningful
 

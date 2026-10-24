@@ -7,7 +7,7 @@ Two pieces:
   other actively traded stocks in those sectors that have risen over the last
   20 sessions. It is a screening aid, not advice: every idea carries the
   plain-English reasons it was picked. It deliberately does NOT use the Prophet
-  forecasts: tested on 260 stocks (examples/validate_forecasts.py) they were
+  forecasts: tested on 260 stocks (scripts/validate_forecasts.py) they were
   less accurate than assuming no change and called the direction right less
   than half the time.
 * ``holdings_forecast()`` -- the Prophet 30-day price range applied to each

@@ -7,19 +7,19 @@ Consolidates what used to be five separate single-purpose scripts
 (dump_company_list.py, probe_company_list.py, dump_index_history.py,
 dump_live_fields.py, check_live_nepse.py) written at different times to
 answer different one-off questions about NEPSE's API surface. Their
-findings are already baked into the real code (src/scraper/live_market.py's
-field-picking, examples/fetch_new_tickers.py's ticker diff) -- this script
+findings are already baked into the real code (ml/scraper/live_market.py's
+field-picking, scripts/fetch_new_tickers.py's ticker diff) -- this script
 exists for the next time that surface needs re-checking (NEPSE changes a
 field name, a new endpoint shows up, a reachability question comes up on a
 new host), not as part of the regular data pipeline.
 
 Run from the repo root with your venv active:
-    python examples/explore_nepse_api.py --check            # is NEPSE reachable from here?
-    python examples/explore_nepse_api.py --companies         # company list breakdown + CSV dump
-    python examples/explore_nepse_api.py --methods           # every client method, tried generically
-    python examples/explore_nepse_api.py --index-history     # intraday vs daily index/graph shape
-    python examples/explore_nepse_api.py --live-fields        # exact field names on live endpoints
-    python examples/explore_nepse_api.py --all               # run everything above
+    python scripts/explore_nepse_api.py --check            # is NEPSE reachable from here?
+    python scripts/explore_nepse_api.py --companies         # company list breakdown + CSV dump
+    python scripts/explore_nepse_api.py --methods           # every client method, tried generically
+    python scripts/explore_nepse_api.py --index-history     # intraday vs daily index/graph shape
+    python scripts/explore_nepse_api.py --live-fields        # exact field names on live endpoints
+    python scripts/explore_nepse_api.py --all               # run everything above
 """
 import argparse
 import csv

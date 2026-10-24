@@ -26,7 +26,7 @@ jobs:
       - id: plan
         run: |
           pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 loguru >/dev/null
-          echo "sectors=$(python examples/retrain_with_gate.py plan)" >> "$GITHUB_OUTPUT"
+          echo "sectors=$(python scripts/retrain_with_gate.py plan)" >> "$GITHUB_OUTPUT"
 
   train:
     needs: plan
@@ -49,9 +49,9 @@ jobs:
       - name: Download full price history
         run: |
           gh release download data-latest -p data-snapshot.tar.gz --clobber
-          python examples/data_snapshot.py unpack
+          python scripts/data_snapshot.py unpack
       - name: Train class-weighted candidate, compare with current
-        run: python examples/retrain_with_gate.py run --sector "${{ matrix.sector }}" --out-dir result --class-weight --keep-files
+        run: python scripts/retrain_with_gate.py run --sector "${{ matrix.sector }}" --out-dir result --class-weight --keep-files
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -77,7 +77,7 @@ jobs:
       - name: Comparison table
         run: |
           pip install pandas==2.1.3 numpy==1.26.2 scikit-learn==1.3.2 loguru >/dev/null
-          python examples/retrain_with_gate.py report --artifacts artifacts | tee -a "$GITHUB_STEP_SUMMARY"
+          python scripts/retrain_with_gate.py report --artifacts artifacts | tee -a "$GITHUB_STEP_SUMMARY"
 
   backtest:
     needs: train
@@ -97,7 +97,7 @@ jobs:
       - name: Download full price history
         run: |
           gh release download data-latest -p data-snapshot.tar.gz --clobber
-          python examples/data_snapshot.py unpack
+          python scripts/data_snapshot.py unpack
       - uses: actions/download-artifact@v4
         with:
           pattern: cw-*
@@ -107,7 +107,7 @@ jobs:
           mkdir -p data/models
           cp deploy_data/models/*_oos* deploy_data/models/*_split_date.txt data/models/ 2>/dev/null || true
           for d in artifacts/*/files; do cp "$d"/* data/models/; done
-          python examples/run_backtests_oos.py
+          python scripts/run_backtests_oos.py
           cp data/models/backtest_summary_oos.csv cw_backtest.csv
       - name: Compare with deployed models
         run: |

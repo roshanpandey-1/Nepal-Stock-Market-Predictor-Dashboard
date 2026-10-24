@@ -38,13 +38,13 @@ jobs:
       - name: Download full price history
         run: |
           gh release download data-latest -p data-snapshot.tar.gz --clobber
-          python examples/data_snapshot.py unpack
+          python scripts/data_snapshot.py unpack
 
       - name: Run backtests with the deployed models
         run: |
           mkdir -p data/models
           cp deploy_data/models/* data/models/
-          python examples/run_backtests_oos.py
+          python scripts/run_backtests_oos.py
           cp data/models/backtest_summary_oos.csv deploy_data/models/
 
       - name: Commit and push if anything changed

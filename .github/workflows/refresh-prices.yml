@@ -6,7 +6,7 @@ name: Refresh daily prices
 # forecast / retrain job reads.
 #
 # ONE-TIME SETUP: create a release tagged `data-latest` with data-snapshot.tar.gz
-# attached (made by `python examples/data_snapshot.py pack`). See that script.
+# attached (made by `python scripts/data_snapshot.py pack`). See that script.
 on:
   schedule:
     - cron: "30 10 * * 1-5"   # Mon-Fri (NEPSE trading days), 10:30 UTC = 16:15 Nepal, after close
@@ -39,22 +39,22 @@ jobs:
       - name: Download full price history
         run: |
           gh release download data-latest -p data-snapshot.tar.gz --clobber
-          python examples/data_snapshot.py unpack
+          python scripts/data_snapshot.py unpack
 
       - name: Fetch new daily rows (Sharesansar)
-        run: python examples/fetch_incremental_data.py
+        run: python scripts/fetch_incremental_data.py
 
       # A blocked scrape looks like "no new rows", so fail loudly if the data
       # is stale (limit allows for the long Dashain/Tihar market closures).
       - name: Freshness check
-        run: python examples/data_snapshot.py check --max-age-days 12
+        run: python scripts/data_snapshot.py check --max-age-days 12
 
       - name: Rebuild trimmed deploy_data/processed
-        run: python examples/build_deploy_snapshot.py --only processed
+        run: python scripts/build_deploy_snapshot.py --only processed
 
       - name: Upload updated full history
         run: |
-          python examples/data_snapshot.py pack
+          python scripts/data_snapshot.py pack
           gh release upload data-latest data-snapshot.tar.gz --clobber
 
       - name: Commit and push if anything changed

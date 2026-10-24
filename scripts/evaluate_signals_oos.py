@@ -34,9 +34,9 @@ Costs (100,000-rupee positions, checked 2026-10-24 against published broker sche
   which can only flatter S2).
 
 Run (each step fits in a short shell session):
-  python examples/evaluate_signals_oos.py predict --sectors "Hydro Power"
-  python examples/evaluate_signals_oos.py predict                 # all sectors
-  python examples/evaluate_signals_oos.py report
+  python scripts/evaluate_signals_oos.py predict --sectors "Hydro Power"
+  python scripts/evaluate_signals_oos.py predict                 # all sectors
+  python scripts/evaluate_signals_oos.py report
 Outputs go to data/models/signal_eval/ (gitignored).
 """
 import argparse

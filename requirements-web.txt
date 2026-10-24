@@ -1,6 +1,6 @@
 # Minimal runtime dependencies for serving the Flask dashboard (app/).
 # The full requirements.txt is for the data pipeline / model training and
-# includes heavy packages (Prophet, Transformers, SHAP, Optuna, LightGBM,
+# includes heavy packages (Prophet, SHAP, Optuna, LightGBM,
 # Selenium) this web process never imports -- installing all of that on a
 # free-tier host risks hitting build time/RAM/disk limits for no reason.
 # Pinned to 3.1.0 because NepseUnofficialApi (live NEPSE data) requires
@@ -9,7 +9,7 @@ flask==3.1.0
 flask-cors==4.0.0
 gunicorn==21.2.0
 
-# User accounts / watchlist / portfolio (app/accounts.py). DATABASE_URL points at
+# User accounts / watchlist / portfolio (app/backend/accounts.py). DATABASE_URL points at
 # a free hosted Postgres (Neon/Supabase); psycopg2-binary is its driver.
 Flask-SQLAlchemy==3.1.1
 psycopg2-binary==2.9.9
@@ -27,5 +27,5 @@ torch==2.1.1
 
 # Live NEPSE market data for /api/live. If a host can't install from git, or
 # NEPSE blocks it, the dashboard degrades to end-of-day data automatically --
-# see src/scraper/live_market.py.
+# see ml/scraper/live_market.py.
 nepse @ git+https://github.com/basic-bgnr/NepseUnofficialApi

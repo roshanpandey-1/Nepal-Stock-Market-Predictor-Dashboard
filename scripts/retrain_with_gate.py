@@ -6,7 +6,7 @@ same recent data. Retraining on a schedule without this check could silently
 swap in a worse model (these models are already weak -- see README).
 
 How the comparison stays fair: the candidate is trained exactly as
-src/models/train_one_sector_v3.py does (last 3 months held out). The deployed
+ml/models/train_one_sector_v3.py does (last 3 months held out). The deployed
 ("current") model was trained on an earlier cut-off, so it has never seen the
 new holdout window either. Both are scored on that SAME window.
 
@@ -39,7 +39,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score, recall_score
 
 sys.path.append('.')
-from src.models.train_one_sector_v3 import (  # noqa: E402
+from ml.models.train_one_sector_v3 import (  # noqa: E402
     DROP_COLS, HOLDOUT_MONTHS, SEQ_LEN, load_sector_data,
 )
 
@@ -181,7 +181,7 @@ def cmd_run(a):
     cand_dir.mkdir(parents=True, exist_ok=True)
     decision = {'sector': sector, 'model_type': kind, 'run_date': date.today().isoformat()}
     try:
-        cmd = [sys.executable, 'src/models/train_one_sector_v3.py', '--sector', sector,
+        cmd = [sys.executable, 'ml/models/train_one_sector_v3.py', '--sector', sector,
                '--type', kind, '--out-dir', str(cand_dir), '--max-epochs', str(a.max_epochs)]
         if a.class_weight and kind == 'lstm':
             cmd.append('--class-weight')  # weight the loss by inverse class frequency

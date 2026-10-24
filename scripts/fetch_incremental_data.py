@@ -9,7 +9,7 @@ this is meant to be run periodically to catch the project back up to the
 present day. A run covering a ~3 month gap for 260 tickers should take
 roughly 30-60 minutes depending on network/page-load speed.
 
-Run: python examples/fetch_incremental_data.py
+Run: python scripts/fetch_incremental_data.py
 """
 import sys
 sys.path.append('.')
@@ -23,8 +23,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from src.features.technical_indicators import TechnicalIndicators
-from src.features.labeler import add_labels
+from ml.features.technical_indicators import TechnicalIndicators
+from ml.features.labeler import add_labels
 from loguru import logger
 
 RAW_DIR = Path("data/raw")

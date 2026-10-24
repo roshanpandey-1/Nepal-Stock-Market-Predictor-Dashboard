@@ -234,7 +234,7 @@ def _live_quote_safe(ticker):
     """Live quote for a ticker, or None. Never raises, never blocks long --
     reads the same cached snapshot the dashboard uses."""
     try:
-        from src.scraper.live_market import get_live_quote
+        from ml.scraper.live_market import get_live_quote
         return get_live_quote(ticker)
     except Exception:
         return None

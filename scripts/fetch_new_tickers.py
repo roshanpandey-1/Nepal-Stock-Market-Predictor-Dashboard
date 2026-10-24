@@ -7,7 +7,7 @@ Unlike fetch_historical_data.py, this does NOT touch any ticker we already
 have data for, and it APPENDS the new tickers to ticker_list.txt /
 ticker_list_full.txt instead of overwriting those files.
 
-Run: python examples/fetch_new_tickers.py
+Run: python scripts/fetch_new_tickers.py
 """
 import sys
 sys.path.append('.')
@@ -21,8 +21,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from src.features.technical_indicators import TechnicalIndicators
-from src.features.labeler import add_labels
+from ml.features.technical_indicators import TechnicalIndicators
+from ml.features.labeler import add_labels
 from loguru import logger
 
 # ticker -> sector, from diffing NEPSE's live getCompanyList() (active,

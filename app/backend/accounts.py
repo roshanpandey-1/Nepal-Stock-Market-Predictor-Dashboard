@@ -24,7 +24,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from . import mailer
-from .models import Holding, SearchHistory, User, WatchlistItem, db
+from .database import Holding, SearchHistory, User, WatchlistItem, db
 from . import insights
 from . import portfolio_utils as pu
 

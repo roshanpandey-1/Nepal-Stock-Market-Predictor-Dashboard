@@ -1,4 +1,4 @@
-"""Tests for the 'Why this signal?' explanations (app/explain.py and /api/explain/<ticker>)."""
+"""Tests for the 'Why this signal?' explanations (app/backend/explain.py and /api/explain/<ticker>)."""
 import sys
 from pathlib import Path
 
@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 import numpy as np
 import pytest
 
-from app import explain
+from app.backend import explain
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -57,7 +57,8 @@ def client(monkeypatch, tmp_path):
     pytest.importorskip("torch")
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "t.db"))
     monkeypatch.setenv("SECRET_KEY", "test-secret")
-    from app import api, create_app
+    from app import create_app
+    from app.backend import api
     data = REPO / "deploy_data"
     monkeypatch.setattr(api, "MODELS_DIR", data / "models")
     monkeypatch.setattr(api, "PROCESSED_DIR", data / "processed")

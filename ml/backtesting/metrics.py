@@ -1,7 +1,7 @@
 """
 Backtesting Metrics
 Standalone, reusable performance metrics for a portfolio value series.
-Used by Backtester (src/backtesting/backtester.py) and callable directly
+Used by Backtester (ml/backtesting/backtester.py) and callable directly
 from notebooks or the Flask backtest route.
 """
 import numpy as np

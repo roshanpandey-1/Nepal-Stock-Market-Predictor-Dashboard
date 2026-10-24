@@ -22,7 +22,7 @@ Otherwise the forecasts are labelled as not predictive on the dashboard.
 
 Outcome: none passed. "anchored" was the least wrong (30-day error 7.3% vs 5.6%
 for "no change") and the only one with an honest 80% range, so it became the
-production recipe (src/models/forecaster.py fit_and_forecast) and the dashboard
+production recipe (ml/models/forecaster.py fit_and_forecast) and the dashboard
 shows it as a range of likely prices, not a prediction. The "production" variant
 runs that exact function, so re-running it checks the live recipe.
 
@@ -37,8 +37,8 @@ Decision rules (fixed on 2026-10-24, before the first run):
 The forecasts count as useful predictions only if F1 and F2 both pass.
 
 Run from the repo root (needs prophet, like the weekly forecast job):
-  python examples/validate_forecasts.py run [--variants recent anchored]   # resumable
-  python examples/validate_forecasts.py report
+  python scripts/validate_forecasts.py run [--variants recent anchored]   # resumable
+  python scripts/validate_forecasts.py report
 Results go to data/models/forecast_eval/ (gitignored).
 """
 import argparse
@@ -69,7 +69,7 @@ VARIANTS = {   # overrides on BASE_PARAMS; train_years None = full history
     'recent': {'yearly_seasonality': False, 'train_years': 2},
     'flexible': {'yearly_seasonality': False, 'changepoint_prior_scale': 0.5, 'train_years': 2},
     'anchored': {'yearly_seasonality': False, 'train_years': 2, 'anchor': True},
-    'production': {'production': True},   # src/models/forecaster.fit_and_forecast as deployed
+    'production': {'production': True},   # ml/models/forecaster.fit_and_forecast as deployed
 }
 OUT = Path('data/models/forecast_eval')
 B = 2000
@@ -95,7 +95,7 @@ def _job(args):
     last = float(train.Close.iloc[-1])
     cfg = dict(VARIANTS[variant])
     if cfg.pop('production', False):
-        from src.models.forecaster import fit_and_forecast
+        from ml.models.forecaster import fit_and_forecast
         fc = fit_and_forecast(train, targets.Date.values).reset_index(drop=True)
         return _rows(ticker, origin, variant, last, targets, fc)
     years, anchor = cfg.pop('train_years', None), cfg.pop('anchor', False)

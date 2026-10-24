@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings('ignore')
 from loguru import logger
 
-# Production forecast recipe, shared with examples/validate_forecasts.py so the
+# Production forecast recipe, shared with scripts/validate_forecasts.py so the
 # accuracy check always tests exactly what the weekly forecast job runs.
 #
 # Chosen by that check (2026-10-24, 260 stocks, 5 past start dates): fitting the

@@ -1,5 +1,5 @@
 """
-Tests for src/features: technical_indicators.py and labeler.py
+Tests for ml/features: technical_indicators.py and labeler.py
 """
 import sys
 from pathlib import Path
@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.features.technical_indicators import TechnicalIndicators
-from src.features.labeler import add_labels, BUY_THRESHOLD, SELL_THRESHOLD
+from ml.features.technical_indicators import TechnicalIndicators
+from ml.features.labeler import add_labels, BUY_THRESHOLD, SELL_THRESHOLD
 
 
 def make_synthetic_ohlcv(n=120, seed=42):

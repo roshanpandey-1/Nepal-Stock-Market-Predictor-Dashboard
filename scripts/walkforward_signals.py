@@ -22,9 +22,9 @@ better than Phase A only if ALL hold across the six quarters:
 Otherwise Phase A's conclusion stands.
 
 Run from the repo root (each step is resumable; finished quarters/sectors are skipped):
-  python examples/walkforward_signals.py train  [--windows 2025Q1 ...] [--sectors ...]
-  python examples/walkforward_signals.py score
-  python examples/walkforward_signals.py report
+  python scripts/walkforward_signals.py train  [--windows 2025Q1 ...] [--sectors ...]
+  python scripts/walkforward_signals.py score
+  python scripts/walkforward_signals.py report
 Models and results go to data/models/walkforward/ (gitignored).
 """
 import argparse
@@ -69,7 +69,7 @@ def _name(sector):
 
 def train_one(sector, window):
     """Train one sector model on the 2 years before the quarter starts."""
-    from src.models import train_one_sector_v3 as tr
+    from ml.models import train_one_sector_v3 as tr
     import torch
     torch.manual_seed(SEED)
     np.random.seed(SEED)

@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from app import model_evidence as me
+from app.backend import model_evidence as me
 
 HEADER = ("run_date,sector,model_type,decision,reason,old_accuracy,new_accuracy,old_macro_f1,new_macro_f1,"
           "baseline_class,baseline_accuracy,baseline_macro_f1,old_buy_recall,new_buy_recall,old_sell_recall,"

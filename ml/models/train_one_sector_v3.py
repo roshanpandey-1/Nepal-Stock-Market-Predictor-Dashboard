@@ -3,18 +3,18 @@ Reconstructed v3 sector trainer -- chronological (out-of-sample) holdout version
 
 The original train_one_sector_v3.py / train_manufacturing_v3.py that produced the
 project's deployed *_oos models are missing from the repo (only the consumer,
-examples/run_backtests_oos.py, and the resulting model files survived). This
+scripts/run_backtests_oos.py, and the resulting model files survived). This
 script is rebuilt to match exactly what run_backtests_oos.py expects to load:
 
   data/models/<Sector>_lstm_model_oos.pth   (or _xgb_model_oos.pkl)
   data/models/<Sector>_scaler_oos.pkl       (LSTM only)
   data/models/<Sector>_split_date.txt       (holdout start date)
 
-Differences from the plain src/models/sector_trainer.py in this repo:
+Differences from the original random-split sector trainer (since removed):
   - Holdout is CHRONOLOGICAL (last 3 months by date), not a random split.
   - Sequences for the LSTM are built PER TICKER before being pooled, so a
     sequence never spans the boundary between two different tickers'
-    histories (sector_trainer.py concatenates tickers before sequencing,
+    histories (the old trainer concatenated tickers before sequencing,
     which can leak across tickers -- avoided here on purpose).
   - Only rows strictly BEFORE the holdout start are used for training/fitting
     the scaler, so nothing from the holdout window leaks into training.
