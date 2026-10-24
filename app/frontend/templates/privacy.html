@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="legal-page">
+<h1>Privacy Policy</h1>
+<p class="text-dim">Last updated: 24 October 2026</p>
+
+<p>NEPSE Intelligence is a personal, educational project. This page explains what it stores about you and why.
+You can use the dashboard, stock pages and backtest without an account; nothing about you is stored then.</p>
+
+<h2 class="h5 mt-4">What we store if you create an account</h2>
+<ul>
+  <li>Your email address and, if you give it, your name.</li>
+  <li>A securely hashed version of your password (never the password itself). If you sign in with Google, we
+      store Google's account ID for you instead, along with the name and email Google shares.</li>
+  <li>The stocks on your watchlist, the holdings you enter in your portfolio, and your recent stock searches
+      (used to show your search history and to suggest stocks from sectors you follow).</li>
+</ul>
+
+<h2 class="h5 mt-4">Google sign-in</h2>
+<p>If you choose "Continue with Google", Google shares only your name, email address and a confirmation that the
+email is verified. We do not get access to your Gmail, contacts, files or any other Google data.</p>
+
+<h2 class="h5 mt-4">Cookies and browser storage</h2>
+<p>We use one session cookie to keep you logged in, and your browser remembers your light or dark theme choice.
+There is no advertising or third-party tracking.</p>
+
+<h2 class="h5 mt-4">Who else handles your data</h2>
+<p>The site runs on Render and stores accounts in a hosted PostgreSQL database. Password-reset emails are sent
+through Brevo, which receives your email address only to deliver that message. We do not sell or share your data
+with anyone else.</p>
+
+<h2 class="h5 mt-4">Deleting your data</h2>
+<p>You can delete your account at any time from your <a href="{{ url_for('acct.profile') }}">Profile</a> page.
+This permanently removes your account, watchlist, portfolio and search history.</p>
+
+<h2 class="h5 mt-4">Contact</h2>
+<p>Questions about this policy: <a href="mailto:nepse.intelligence0852@gmail.com">nepse.intelligence0852@gmail.com</a>.</p>
+</div>
+{% endblock %}

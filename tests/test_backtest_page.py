@@ -60,3 +60,13 @@ def test_sentiment_is_gone_from_the_dashboard(make_client):
     assert c.get("/api/sentiment/NABIL").status_code == 404
     html = c.get("/backtest").get_data(as_text=True)
     assert ">Sentiment</a>" not in html
+
+
+def test_privacy_and_terms_pages_are_public_and_linked(make_client):
+    c = make_client(True)
+    privacy = c.get("/privacy")
+    terms = c.get("/terms")
+    assert privacy.status_code == 200 and "Privacy Policy" in privacy.get_data(as_text=True)
+    assert terms.status_code == 200 and "Not financial advice" in terms.get_data(as_text=True)
+    footer = c.get("/backtest").get_data(as_text=True)
+    assert 'href="/privacy"' in footer and 'href="/terms"' in footer

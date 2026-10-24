@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="legal-page">
+<h1>Terms of Service</h1>
+<p class="text-dim">Last updated: 24 October 2026</p>
+
+<p>NEPSE Intelligence is a personal, educational project about the Nepal Stock Exchange. By using it you agree
+to these terms.</p>
+
+<h2 class="h5 mt-4">Not financial advice</h2>
+<p>Nothing on this site is financial, investment or trading advice. The Buy/Sell/Hold signals, price ranges and
+stock ideas come from experimental models. As the <a href="{{ url_for('main.backtest') }}">Backtest</a> page shows,
+they have not been able to make money after trading costs, and the price ranges were less accurate than assuming
+prices stay the same. Do not make investment decisions based on this site; consult a licensed advisor.</p>
+
+<h2 class="h5 mt-4">Data accuracy</h2>
+<p>Market data is collected from public sources and may be delayed, incomplete or wrong. The site is provided
+"as is", without any guarantee that it is accurate, complete or available.</p>
+
+<h2 class="h5 mt-4">Your account</h2>
+<p>Keep your login details safe and use the site only for lawful purposes. Accounts may be removed if they are
+used to abuse or overload the service. You can delete your account at any time from your Profile page.</p>
+
+<h2 class="h5 mt-4">Liability</h2>
+<p>To the extent allowed by law, the author is not responsible for any loss arising from use of this site.</p>
+
+<h2 class="h5 mt-4">Changes and contact</h2>
+<p>These terms may change; the date above shows the latest version. Questions:
+<a href="mailto:nepse.intelligence0852@gmail.com">nepse.intelligence0852@gmail.com</a>. See also the
+<a href="{{ url_for('main.privacy') }}">Privacy Policy</a>.</p>
+</div>
+{% endblock %}

@@ -281,6 +281,16 @@ def _signal_evidence():
         return None
 
 
+@main.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@main.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
 @main.route("/backtest")
 def backtest():
     rows = _read_csv(MODELS_DIR / "backtest_summary_oos.csv")

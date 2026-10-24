@@ -870,3 +870,13 @@ table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: 
 .ex-bar::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--text-dim); opacity: 0.6; }
 .ex-share { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
 @media (max-width: 575.98px) { .ex-row { grid-template-columns: 1fr; gap: 3px; } }
+
+/* --- Footer and legal pages --- */
+.site-footer {
+  display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; align-items: center;
+  padding: 18px 16px 26px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-dim);
+}
+.site-footer a { color: var(--text-dim); }
+.site-footer a:hover { color: var(--accent); }
+.legal-page { max-width: 760px; line-height: 1.6; }
+.legal-page ul { padding-left: 1.2rem; }
