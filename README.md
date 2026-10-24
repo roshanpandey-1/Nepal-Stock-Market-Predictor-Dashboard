@@ -202,7 +202,7 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for full details.
 - [ ] Class weighting in the training loss to address majority-class collapse
 - [ ] Automated daily data refresh (scheduled scrape → retrain → redeploy)
 - [ ] Per-ticker news sentiment (currently market-wide only)
-- [ ] Validated price forecasting — Prophet/LSTM forecasting code exists in `src/models/` but has not been validated, so it is **not** wired into the dashboard
+- [x] Price forecast validation — `examples/validate_forecasts.py` tested Prophet on 260 stocks from 5 past start dates. No version beat simply assuming the price stays the same (30-day error 7.3% for the deployed recipe vs 5.6% for "no change"; the original full-history setup was 18.2%), so the dashboard shows it as a 30-day range of likely prices with these numbers beside it, and the portfolio Ideas tab no longer uses it
 
 ## ⚠️ Disclaimer
 

@@ -107,19 +107,25 @@
 </div>
 
 <div class="card-panel" id="forecast-panel" style="display:none;">
-  <h3 style="border-bottom:none; margin-bottom:6px;">Price Forecast</h3>
+  <h3 style="border-bottom:none; margin-bottom:6px;">30-Day Price Range</h3>
   <div class="limitation-note" style="margin-bottom:12px;">
-    A statistical forecast (Prophet, fit on this ticker's daily closing prices) -- a separate
-    model from the Buy/Sell/Hold signal above, and independent of the live price shown at the
-    top of this page. It updates only when the forecast batch is re-run, not in real time.
-    Treat it as illustrative, especially for tickers with limited price history.
+    {% if forecast_evidence %}{% set e = forecast_evidence %}
+    <strong>{{ e.headline }}</strong> Tested on {{ e.stocks }} stocks from {{ e.start_dates }} past start dates
+    ({{ e.period }}): after {{ e.horizon_days }} trading days the middle line was off by {{ e.error_30d_pct }}% on
+    average, against {{ e.no_change_error_30d_pct }}% for assuming no change, and it called the direction (up or down)
+    right only {{ e.direction_right_30d_pct }}% of the time. The shaded {{ e.range_level_pct }}% range contained the real
+    price {{ e.range_coverage_30d_pct }}% of the time, so use it as a rough guide to how far this stock tends to move,
+    not to where it will go.
+    {% else %}This is a statistical range of likely prices, not a tested prediction.{% endif %}
+    It comes from Prophet, fitted on this stock's last 2 years of closing prices and started from the latest close.
+    It is separate from the Buy/Sell/Hold signal above and is updated weekly, not in real time.
   </div>
   <div class="row g-3 mb-3">
     <div class="col-6 col-md-3">
       <div class="stat-tile sm"><div class="label">Snapshot Price</div><div class="value" id="forecast-current">—</div></div>
     </div>
     <div class="col-6 col-md-3">
-      <div class="stat-tile sm"><div class="label">30-Day Forecast</div><div class="value" id="forecast-price">—</div></div>
+      <div class="stat-tile sm"><div class="label">Middle of Range (30 days)</div><div class="value" id="forecast-price">—</div></div>
     </div>
     <div class="col-6 col-md-3">
       <div class="stat-tile sm"><div class="label">Lower Bound</div><div class="value" id="forecast-lower">—</div></div>

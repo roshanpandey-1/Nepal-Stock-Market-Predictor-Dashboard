@@ -478,7 +478,7 @@ def watchlist_page():
 @acct.route("/portfolio")
 @login_required
 def portfolio():
-    return render_template("portfolio.html")
+    return render_template("portfolio.html", forecast_evidence=insights.load_forecast_evidence())
 
 
 # --- JSON API: watchlist ------------------------------------------------------------
@@ -654,8 +654,7 @@ def api_recommendations():
     except ValueError:
         limit = 5
     stats = insights.market_stats(r._ticker_list())
-    summary, _ = insights.load_forecasts()
-    ideas = insights.recommend(held, searched, stats, summary, names=r._company_names(),
+    ideas = insights.recommend(held, searched, stats, names=r._company_names(),
                                limit=limit, exclude=watching)
     return jsonify({"ok": True, "items": ideas,
                     "basis": ideas[0]["basis"] if ideas else ("personal" if held or searched else "market")})

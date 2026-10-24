@@ -15,7 +15,7 @@
 
 <div class="pf-tabs" role="tablist" aria-label="Portfolio sections">
   <button type="button" role="tab" id="tab-holdings" aria-controls="pf-holdings" aria-selected="true" data-tab="holdings">Holdings</button>
-  <button type="button" role="tab" id="tab-forecast" aria-controls="pf-forecast" aria-selected="false" data-tab="forecast" tabindex="-1">Forecast</button>
+  <button type="button" role="tab" id="tab-forecast" aria-controls="pf-forecast" aria-selected="false" data-tab="forecast" tabindex="-1">Price range</button>
   <button type="button" role="tab" id="tab-ideas" aria-controls="pf-ideas" aria-selected="false" data-tab="ideas" tabindex="-1">Ideas</button>
 </div>
 
@@ -43,25 +43,35 @@
 </section>
 
 <section id="pf-forecast" role="tabpanel" aria-labelledby="tab-forecast" hidden>
+  <div class="limitation-note" style="margin:0 0 14px;">
+    {% if forecast_evidence %}{% set e = forecast_evidence %}
+    <strong>{{ e.headline }}</strong> Tested on {{ e.stocks }} stocks from {{ e.start_dates }} past start dates
+    ({{ e.period }}): after {{ e.horizon_days }} trading days the middle line was off by {{ e.error_30d_pct }}% on
+    average, against {{ e.no_change_error_30d_pct }}% for assuming no change, and it called the direction (up or down)
+    right only {{ e.direction_right_30d_pct }}% of the time. The shaded {{ e.range_level_pct }}% range contained the real
+    price {{ e.range_coverage_30d_pct }}% of the time, so use it as a rough guide to how far this stock tends to move,
+    not to where it will go.
+    {% else %}This is a statistical range of likely prices, not a tested prediction.{% endif %}
+  </div>
   <div class="row g-2 mb-3">
     <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Value now</div><div class="value" id="fc-now">—</div></div></div>
-    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Projected in 30 days</div><div class="value" id="fc-proj">—</div></div></div>
-    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Expected change</div><div class="value" id="fc-chg">—</div></div></div>
-    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Forecast range</div><div class="value" id="fc-range" style="font-size:1rem;">—</div></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Middle of range (30 days)</div><div class="value" id="fc-proj">—</div></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Change to middle</div><div class="value" id="fc-chg">—</div></div></div>
+    <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Likely range (80%)</div><div class="value" id="fc-range" style="font-size:1rem;">—</div></div></div>
   </div>
 
   <div class="row g-3">
     <div class="col-xl-6">
       <div class="card-panel h-100">
-        <h3>Expected move by holding</h3>
-        <p class="text-dim fc-help">Bar = the forecast's likely range in 30 days, ◆ = the central forecast, both measured from today's price.</p>
+        <h3>Likely range by holding</h3>
+        <p class="text-dim fc-help">Bar = the 80% range in 30 days, ◆ = the middle of the range, both measured from today's price.</p>
         <div class="chart-box" id="fc-range-box"><canvas id="fc-range-chart"></canvas></div>
       </div>
     </div>
     <div class="col-xl-6">
       <div class="card-panel h-100">
         <h3 class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <span>Forecast path</span>
+          <span>Range over 30 days</span>
           <select id="fc-pick" class="form-select form-select-sm fc-pick" aria-label="Holding to chart"></select>
         </h3>
         <div class="fc-path-meta" id="fc-path-meta"></div>
@@ -71,7 +81,7 @@
   </div>
 
   <div class="card-panel">
-    <h3>Forecast by holding</h3>
+    <h3>Range by holding</h3>
     <div class="table-scroll" id="fc-table"><span class="text-dim">Loading…</span></div>
     <p class="text-dim mt-2 mb-0" id="fc-foot" style="font-size:0.74rem;"></p>
   </div>
@@ -85,9 +95,9 @@
   </div>
   <div class="limitation-note">
     These ideas come from simple rules, not from a model that has been shown to pick winners: stocks in the sectors
-    you hold or search, from the more actively traded half of the market, ranked by their 30-day Prophet forecast
-    and their last 20 sessions of price movement. Forecasts are illustrative and often wrong. Treat this as a
-    starting list to research, not as a recommendation to buy.
+    you hold or search, from the more actively traded half of the market, that have risen over their last 20 sessions.
+    A recent rise does not mean a stock will keep rising. The price ranges are not used here, because in testing they did
+    not predict prices better than assuming no change. Treat this as a starting list to research, not as a recommendation to buy.
   </div>
 </section>
 

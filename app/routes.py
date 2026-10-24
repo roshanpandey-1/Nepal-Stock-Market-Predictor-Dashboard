@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from flask import Blueprint, render_template, abort, request
 
-from . import news_utils
+from . import insights, news_utils
 
 HEADLINES_PER_PAGE = 25
 
@@ -277,6 +277,7 @@ def stock_detail(ticker):
         company_name=_company_name(ticker),
         quote=_latest_quote(ticker),
         has_history=True,
+        forecast_evidence=insights.load_forecast_evidence(),
     )
 
 

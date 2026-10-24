@@ -18,32 +18,29 @@ STATS = {
     "UPPER": {"sector": "Hydro Power", "close": 200, "mom20": 12.0, "turnover20": 9e7},
     "NLIC":  {"sector": "Life Insurance", "close": 700, "mom20": 3.0, "turnover20": 5e7},
 }
-FC = {t: {"change_pct": c, "forecast_price": 1, "lower_bound": 1, "upper_bound": 1,
-          "current_price": 1, "horizon_days": 30, "generated_at": "2026-10-12"}
-      for t, c in {"NABIL": 1, "SCB": 5, "NICA": 2, "ADBL": -4, "TINY": 9, "UPPER": 8, "NLIC": 1}.items()}
 
 
 def test_ideas_stay_in_users_sectors_and_skip_held():
-    ideas = insights.recommend(["NABIL"], [], STATS, FC, limit=5)
+    ideas = insights.recommend(["NABIL"], [], STATS, limit=5)
     tickers = [i["ticker"] for i in ideas]
     assert "NABIL" not in tickers                     # already held
     assert "UPPER" not in tickers                     # other sector
     assert "TINY" not in tickers                      # too illiquid
-    assert "ADBL" not in tickers                      # negative score
-    assert tickers[0] == "SCB"                        # best forecast + momentum
+    assert "ADBL" not in tickers                      # fell over 20 sessions
+    assert tickers[0] == "SCB"                        # strongest 20-session rise
     assert ideas[0]["reasons"][0] == "Same sector as NABIL (you hold it)"
     assert all(i["basis"] == "personal" for i in ideas)
 
 
 def test_searched_sector_counts_and_watched_excluded():
-    ideas = insights.recommend([], ["UPPER"], STATS, FC, exclude=["SCB"])
+    ideas = insights.recommend([], ["UPPER"], STATS, exclude=["SCB"])
     assert [i["ticker"] for i in ideas] == []         # only UPPER in Hydro, and it was searched
-    ideas = insights.recommend(["NICA"], ["UPPER"], STATS, FC, exclude=["SCB"])
+    ideas = insights.recommend(["NICA"], ["UPPER"], STATS, exclude=["SCB"])
     assert "SCB" not in [i["ticker"] for i in ideas]
 
 
 def test_no_history_falls_back_to_market_and_caps_per_sector():
-    ideas = insights.recommend([], [], STATS, FC, limit=10)
+    ideas = insights.recommend([], [], STATS, limit=10)
     assert ideas and all(i["basis"] == "market" for i in ideas)
     from collections import Counter
     assert max(Counter(i["sector"] for i in ideas).values()) <= 2
@@ -70,9 +67,12 @@ def test_holdings_forecast_rescales_when_price_moved_a_lot():
     assert item["rescaled"] is True and item["forecast_price"] == 110.0 and item["change_pct"] == 10.0
 
 
-def test_ideas_need_a_positive_forecast():
-    fc = dict(FC, SCB=dict(FC["SCB"], change_pct=-1.0))
-    assert "SCB" not in [i["ticker"] for i in insights.recommend(["NABIL"], [], STATS, fc)]
+def test_ideas_need_a_recent_rise_and_ignore_forecasts():
+    stats = dict(STATS, SCB=dict(STATS["SCB"], mom20=-1.0))
+    ideas = insights.recommend(["NABIL"], [], stats)
+    assert "SCB" not in [i["ticker"] for i in ideas]
+    assert all("forecast" not in r.lower() for i in ideas for r in i["reasons"])
+    assert all("forecast_pct" not in i for i in ideas)
 
 
 # ---------------- API ----------------
@@ -124,3 +124,29 @@ def test_portfolio_forecast_and_ideas_endpoints(client, monkeypatch):
     assert d["ok"] and d["items"][0]["change_pct"] == 10.0 and d["totals"]["value_forecast"] == 11000
     r = client.get("/api/me/recommendations").get_json()
     assert r["basis"] == "personal" and [i["ticker"] for i in r["items"]] == ["SCB"]
+
+
+# ---------------- forecast evidence shown next to every price range ----------------
+def test_shipped_forecast_evidence_says_it_is_not_a_prediction(monkeypatch):
+    monkeypatch.setattr(insights, "MODELS_DIR", Path(__file__).resolve().parents[1] / "deploy_data" / "models")
+    insights._EV_CACHE.update(mtime=None, data=None)
+    e = insights.load_forecast_evidence()
+    assert e and "not a prediction" in e["headline"]
+    assert e["error_30d_pct"] > e["no_change_error_30d_pct"]          # the honest result
+    assert 0 < e["range_coverage_30d_pct"] < 100 and e["range_level_pct"] == 80
+
+
+def test_missing_forecast_evidence_is_none(monkeypatch, tmp_path):
+    monkeypatch.setattr(insights, "MODELS_DIR", tmp_path)
+    insights._EV_CACHE.update(mtime=None, data=None)
+    assert insights.load_forecast_evidence() is None
+
+
+def test_portfolio_page_shows_the_forecast_test(client, monkeypatch):
+    monkeypatch.setattr(insights, "load_forecast_evidence", lambda: {
+        "headline": "This is a range of likely prices, not a prediction.", "stocks": 260, "start_dates": 5,
+        "period": "Oct 2025 to Jun 2026", "horizon_days": 30, "error_30d_pct": 7.3, "no_change_error_30d_pct": 5.6,
+        "direction_right_30d_pct": 43.2, "range_level_pct": 80, "range_coverage_30d_pct": 73.2})
+    _signup(client)
+    html = client.get("/portfolio").get_data(as_text=True)
+    assert "not a prediction" in html and "43.2%" in html and ">Price range</button>" in html

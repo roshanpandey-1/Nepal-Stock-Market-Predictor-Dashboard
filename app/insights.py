@@ -3,17 +3,22 @@
 Two pieces:
 
 * ``recommend()`` -- a transparent, rule-based "ideas to research" list. It
-  looks at the sectors a user holds or has recently searched, then ranks the
-  other liquid stocks in those sectors by their Prophet 30-day forecast and
-  20-day price momentum. It is a screening aid, not advice: every idea carries
-  the plain-English reasons it was picked.
-* ``holdings_forecast()`` -- the Prophet forecast applied to each holding:
-  projected price, range and value, plus a portfolio total.
+  looks at the sectors a user holds or has recently searched, then lists the
+  other actively traded stocks in those sectors that have risen over the last
+  20 sessions. It is a screening aid, not advice: every idea carries the
+  plain-English reasons it was picked. It deliberately does NOT use the Prophet
+  forecasts: tested on 260 stocks (examples/validate_forecasts.py) they were
+  less accurate than assuming no change and called the direction right less
+  than half the time.
+* ``holdings_forecast()`` -- the Prophet 30-day price range applied to each
+  holding: middle of the range, the range and value, plus a portfolio total.
+* ``load_forecast_evidence()`` -- the test result shown next to every range.
 
 The scoring functions are pure (no Flask, no files) so they are easy to test;
 the loaders below cache the CSVs in memory.
 """
 import csv
+import json
 import os
 import time
 from pathlib import Path
@@ -29,6 +34,19 @@ STATS_TTL = 3600  # market stats only change once a day
 
 # --------------------------------------------------------------------------- loaders
 _FC_CACHE = {"mtime": None, "summary": {}, "daily": {}}
+_EV_CACHE = {"mtime": None, "data": None}
+
+
+def load_forecast_evidence():
+    """The forecast accuracy test (models/forecast_evidence.json), or None if missing."""
+    path = MODELS_DIR / "forecast_evidence.json"
+    try:
+        mtime = path.stat().st_mtime
+        if _EV_CACHE["mtime"] != mtime:
+            _EV_CACHE.update(mtime=mtime, data=json.loads(path.read_text(encoding="utf-8")))
+        return _EV_CACHE["data"]
+    except (OSError, ValueError):
+        return None
 
 
 def load_forecasts():
@@ -118,12 +136,11 @@ def _clip(v, lo=-20.0, hi=20.0):
     return max(lo, min(hi, v))
 
 
-def recommend(held, searched, stats, forecasts, names=None, limit=5, exclude=()):
+def recommend(held, searched, stats, names=None, limit=5, exclude=()):
     """Rank "ideas to research" for one user.
 
-    held / searched: ticker lists (searched newest first).
-    stats: market_stats() output.  forecasts: load_forecasts()[0].
-    Returns a list of {ticker, name, sector, score, forecast_pct, mom20, reasons, basis}.
+    held / searched: ticker lists (searched newest first).  stats: market_stats() output.
+    Returns a list of {ticker, name, sector, score, mom20, close, reasons, basis}.
     """
     names = names or {}
     held = [t for t in held if t in stats]
@@ -143,22 +160,10 @@ def recommend(held, searched, stats, forecasts, names=None, limit=5, exclude=())
     floor = turnovers[len(turnovers) // 2] if turnovers else 0
 
     def scored(ticker):
-        s, fc = stats[ticker], forecasts.get(ticker)
-        if fc is None or s["turnover20"] < floor:
+        s = stats[ticker]
+        if s["turnover20"] < floor or s["mom20"] <= 0:
             return None
-        # Prophet sometimes extrapolates wildly on thin or trending series; a
-        # forecast of more than +/-25% in 30 days, or a band wider than the
-        # price itself, is too unreliable to rank on.
-        band = (fc["upper_bound"] - fc["lower_bound"]) / fc["current_price"] if fc.get("current_price") else 0
-        if abs(fc["change_pct"]) > 25 or band > 1.0:
-            return None
-        # an idea needs the forecast pointing up and no sharp recent slide
-        if fc["change_pct"] <= 0 or s["mom20"] < -5:
-            return None
-        score = 0.6 * _clip(fc["change_pct"]) / 20 + 0.4 * _clip(s["mom20"]) / 20
-        if score <= 0:
-            return None
-        return score
+        return _clip(s["mom20"]) / 20
 
     basis = "personal" if anchors else "market"
     pool = [t for t in stats if t not in skip and (not anchors or stats[t]["sector"] in anchors)]
@@ -167,16 +172,16 @@ def recommend(held, searched, stats, forecasts, names=None, limit=5, exclude=())
         score = scored(t)
         if score is None:
             continue
-        s, fc = stats[t], forecasts[t]
+        s = stats[t]
         reasons = []
         if anchors:
             kind, src = anchors[s["sector"]]
             reasons.append(f"Same sector as {src}" + (" (you hold it)" if kind == "hold" else " (you searched it)"))
-        reasons.append(f"30-day forecast {fc['change_pct']:+.1f}%")
-        reasons.append(f"{'Up' if s['mom20'] >= 0 else 'Down'} {abs(s['mom20']):.1f}% over 20 sessions")
+        reasons.append(f"Up {s['mom20']:.1f}% over the last 20 sessions")
+        reasons.append("In the more actively traded half of the market")
         ideas.append({
             "ticker": t, "name": names.get(t, t), "sector": s["sector"], "score": round(score, 3),
-            "forecast_pct": fc["change_pct"], "mom20": s["mom20"], "close": s["close"],
+            "mom20": s["mom20"], "close": s["close"],
             "reasons": reasons, "basis": basis,
         })
     ideas.sort(key=lambda x: -x["score"])

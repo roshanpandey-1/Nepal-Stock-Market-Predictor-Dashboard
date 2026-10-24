@@ -453,7 +453,7 @@ function _renderForecastTab(d) {
   const foot = document.getElementById("fc-foot");
   if (!d.items.length) {
     ["fc-now", "fc-proj", "fc-chg", "fc-range"].forEach(id => set(id, "—"));
-    table.innerHTML = `<p class="text-dim mb-0">${d.missing.length ? "None of your holdings have a forecast yet." : "Add a holding to see its forecast."}</p>`;
+    table.innerHTML = `<p class="text-dim mb-0">${d.missing.length ? "None of your holdings have a price range yet." : "Add a holding to see its price range."}</p>`;
     foot.textContent = "";
     _renderForecastRange([]); _renderForecastPath(null);
     document.getElementById("fc-pick").innerHTML = "";
@@ -465,10 +465,10 @@ function _renderForecastTab(d) {
   set("fc-range", `Rs ${_rs(t.value_low, 0)} – ${_rs(t.value_high, 0)}`);
 
   table.innerHTML = `<table class="data-table fc-table">
-    <thead><tr><th>Scrip</th><th class="num">Qty</th><th class="num">LTP</th><th class="num">30-day forecast</th>
-      <th class="num">Expected</th><th class="num">Likely range</th><th class="num">Value now</th><th class="num">Projected value</th><th class="num">Change</th></tr></thead>
+    <thead><tr><th>Scrip</th><th class="num">Qty</th><th class="num">LTP</th><th class="num">Middle (30 days)</th>
+      <th class="num">Change</th><th class="num">80% range</th><th class="num">Value now</th><th class="num">Value at middle</th><th class="num">Difference</th></tr></thead>
     <tbody>${d.items.map(r => `<tr data-fc="${_esc(r.ticker)}" tabindex="0" title="Show ${_esc(r.ticker)} on the chart">
-      <td><a href="/stock/${encodeURIComponent(r.ticker)}">${_esc(r.ticker)}</a>${r.rescaled ? ` <span class="text-dim" title="Price moved 20%+ since the forecast ran; see note below">*</span>` : ""}</td>
+      <td><a href="/stock/${encodeURIComponent(r.ticker)}">${_esc(r.ticker)}</a>${r.rescaled ? ` <span class="text-dim" title="Price moved 20%+ since the range was generated; see note below">*</span>` : ""}</td>
       <td class="num">${r.quantity.toLocaleString("en-IN")}</td>
       <td class="num">${_rs(r.ltp)}</td>
       <td class="num">${_rs(r.forecast_price)}</td>
@@ -486,11 +486,11 @@ function _renderForecastTab(d) {
   const wide = d.items.filter(i => i.band_pct >= 40).map(i => i.ticker);
   const rescaled = d.items.filter(i => i.rescaled).map(i => i.ticker);
   foot.innerHTML = [
-    d.generated_at ? `Prophet forecasts generated ${_esc(d.generated_at)}, compared with today's price.` : "",
+    d.generated_at ? `Ranges generated ${_esc(d.generated_at)}, compared with today's price.` : "",
     "The range total adds up each stock's own range, so the true portfolio range is narrower.",
     wide.length ? `Very wide ranges (40%+ of the price), so treat these with extra caution: ${wide.map(_esc).join(", ")}.` : "",
-    rescaled.length ? `The price has moved more than 20% since the forecast ran, so its expected move is applied to today's price: ${rescaled.map(_esc).join(", ")}.` : "",
-    d.missing.length ? `No forecast yet for: ${d.missing.map(_esc).join(", ")}.` : "",
+    rescaled.length ? `The price has moved more than 20% since the range was generated, so its move is applied to today's price: ${rescaled.map(_esc).join(", ")}.` : "",
+    d.missing.length ? `No range yet for: ${d.missing.map(_esc).join(", ")}.` : "",
   ].filter(Boolean).join(" ");
 
   _renderForecastRange(d.items);
@@ -524,13 +524,13 @@ async function _loadIdeasTab(force) {
       ? "Picked from the sectors of the stocks you hold and search for. Stocks you already hold, searched or watch are left out."
       : "Add holdings or search for a few stocks to get ideas from your sectors. For now these are picked across the whole market.";
     if (!d.items.length) {
-      list.innerHTML = `<p class="text-dim mb-0">No ideas right now: nothing in your sectors has both a positive forecast and positive recent momentum.</p>`;
+      list.innerHTML = `<p class="text-dim mb-0">No ideas right now: nothing actively traded in your sectors has risen over the last 20 sessions.</p>`;
       return;
     }
     list.innerHTML = d.items.map(r => `<article class="idea-card">
       <div class="idea-top">
         <a class="idea-sym" href="/stock/${encodeURIComponent(r.ticker)}">${_esc(r.ticker)}</a>
-        <span class="ts-tag ${r.forecast_pct >= 0 ? "pos" : "neg"}" title="30-day forecast">${_signedPct(r.forecast_pct)}</span>
+        <span class="ts-tag ${r.mom20 >= 0 ? "pos" : "neg"}" title="Price change over the last 20 sessions">${_signedPct(r.mom20)}</span>
       </div>
       <div class="idea-name">${_esc(r.name)}</div>
       <div class="text-dim idea-sector">${_esc(r.sector || "")} · Rs ${_rs(r.close)}</div>

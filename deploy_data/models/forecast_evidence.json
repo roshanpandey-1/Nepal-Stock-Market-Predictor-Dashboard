@@ -1,0 +1,14 @@
+{
+ "tested": "2026-10-24",
+ "stocks": 260,
+ "start_dates": 5,
+ "period": "Oct 2025 to Jun 2026",
+ "horizon_days": 30,
+ "error_30d_pct": 7.3,
+ "no_change_error_30d_pct": 5.6,
+ "direction_right_30d_pct": 43.2,
+ "range_level_pct": 80,
+ "range_coverage_30d_pct": 73.2,
+ "previous_error_30d_pct": 18.2,
+ "headline": "This is a range of likely prices, not a prediction. In testing it was less accurate than simply assuming the price stays where it is."
+}

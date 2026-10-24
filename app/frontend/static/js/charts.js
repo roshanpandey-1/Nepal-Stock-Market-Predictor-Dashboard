@@ -1498,9 +1498,9 @@ function _forecastPlotlyTraces() {
     },
     {
       x: days.map(d => d.date), y: days.map(d => d.forecast_price),
-      name: "Forecast", mode: "lines",
+      name: "Middle of range", mode: "lines",
       line: { color: c.red, width: 2 },
-      hovertemplate: "<b>%{x}</b><br>Forecast: Rs. %{y:.1f}<extra></extra>",
+      hovertemplate: "<b>%{x}</b><br>Middle of range: Rs. %{y:.1f}<extra></extra>",
     },
     {
       x: days.map(d => d.date), y: days.map(d => d.upper_bound),
@@ -1510,7 +1510,7 @@ function _forecastPlotlyTraces() {
     },
     {
       x: days.map(d => d.date), y: days.map(d => d.lower_bound),
-      name: "Confidence Interval", mode: "lines",
+      name: "80% range", mode: "lines",
       line: { width: 0 }, fill: "tonexty", fillcolor: c.redFillTransparent,
       hovertemplate: "Lower: Rs. %{y:.1f}<extra></extra>",
     },
@@ -1571,8 +1571,8 @@ async function initForecast(ticker) {
 
     const metaEl = document.getElementById("forecast-meta");
     if (metaEl) {
-      metaEl.textContent = `Snapshot price at forecast time: Rs. ${fc.current_price} `
-        + `(forecast generated ${fc.generated_at}, based on ${fc.rows_used} days of history).`;
+      metaEl.textContent = `Starting price: Rs. ${fc.current_price} `
+        + `(range generated ${fc.generated_at} from the last 2 years of closing prices).`;
     }
   } catch (e) {
     panel.style.display = "none";

@@ -10,6 +10,46 @@ import warnings
 warnings.filterwarnings('ignore')
 from loguru import logger
 
+# Production forecast recipe, shared with examples/validate_forecasts.py so the
+# accuracy check always tests exactly what the weekly forecast job runs.
+#
+# Chosen by that check (2026-10-24, 260 stocks, 5 past start dates): fitting the
+# full history since 2011 with yearly seasonality gave a 30-day error of about
+# 18%, against 5.6% for simply assuming the price stays put. Fitting only the last
+# 2 years and starting the forecast from the last close ("anchored") cut that to
+# 7.3% and made the 80% range roughly honest (72% coverage) -- but it still does
+# not beat "no change", and its up/down call is right less than half the time.
+# So the dashboard presents it as a range of likely prices, not a prediction.
+#
+# weekly_seasonality is off: NEPSE traded Sunday-Thursday until April 2026 and
+# Monday-Friday since, so almost every Friday in the history is a non-trading day,
+# and a weekly term forecasts a fake ~7% drop every Friday.
+PROPHET_PARAMS = dict(
+    daily_seasonality=False,
+    weekly_seasonality=False,
+    yearly_seasonality=False,
+    changepoint_prior_scale=0.05,
+)
+TRAIN_YEARS = 2
+
+
+def fit_and_forecast(history: pd.DataFrame, future_dates) -> pd.DataFrame:
+    """Fit the production recipe on ``history`` (Date, Close) and forecast ``future_dates``.
+
+    Returns ds, yhat, yhat_lower, yhat_upper, shifted so the forecast starts from
+    the last close rather than from Prophet's fitted level.
+    """
+    history = history.dropna(subset=['Close']).drop_duplicates('Date').sort_values('Date')
+    last_date = history['Date'].iloc[-1]
+    train = history[history['Date'] >= last_date - pd.DateOffset(years=TRAIN_YEARS)]
+    model = Prophet(**PROPHET_PARAMS)
+    model.fit(train[['Date', 'Close']].rename(columns={'Date': 'ds', 'Close': 'y'}))
+    fc = model.predict(pd.DataFrame({'ds': pd.to_datetime(list(future_dates))}))
+    fitted_now = float(model.predict(pd.DataFrame({'ds': [last_date]}))['yhat'].iloc[0])
+    shift = float(train['Close'].iloc[-1]) - fitted_now
+    fc[['yhat', 'yhat_lower', 'yhat_upper']] += shift
+    return fc[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+
 
 class StockForecaster:
     def __init__(self):
@@ -37,27 +77,13 @@ class StockForecaster:
         if df.empty:
             return {}
 
-        # Prepare for Prophet
-        prophet_df = df[['Date', 'Close']].rename(
-            columns={'Date': 'ds', 'Close': 'y'}
-        )
-
-        # Train Prophet
-        self.model = Prophet(
-            daily_seasonality=False,
-            weekly_seasonality=True,
-            yearly_seasonality=True,
-            changepoint_prior_scale=0.05
-        )
-        self.model.fit(prophet_df)
-
-        # Forecast
-        future = self.model.make_future_dataframe(periods=periods, freq='B')
-        self.forecast = self.model.predict(future)
+        last_date = df['Date'].iloc[-1]
+        future_dates = pd.bdate_range(last_date + pd.Timedelta(days=1), periods=periods)
+        self.forecast = fit_and_forecast(df[['Date', 'Close']], future_dates)
 
         # Extract key metrics
         current_price = df['Close'].iloc[-1]
-        future_only = self.forecast[self.forecast['ds'] > prophet_df['ds'].max()]
+        future_only = self.forecast
 
         result = {
             'ticker': ticker,
