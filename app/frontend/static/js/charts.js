@@ -159,45 +159,6 @@ function renderBacktestChart(canvasId, rows) {
   _registerThemeRedraw("backtest", () => renderBacktestChart(canvasId, rows));
 }
 
-let _sentimentChartInstance = null;
-
-function renderSentimentChart(canvasId, dailyRows) {
-  const ctx = document.getElementById(canvasId);
-  if (!ctx || !dailyRows || !dailyRows.length) return;
-
-  if (_sentimentChartInstance) {
-    _sentimentChartInstance.destroy();
-  }
-  _sentimentChartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: dailyRows.map(r => r.Date),
-      datasets: [{
-        label: "Avg. Daily Sentiment (FinBERT)",
-        data: dailyRows.map(r => parseFloat(r.avg_sentiment)),
-        borderColor: CHART_COLORS.accent,
-        backgroundColor: "rgba(29,111,214,0.08)",
-        fill: true,
-        tension: 0.25,
-        pointRadius: 2,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: {
-          title: { display: true, text: "Sentiment (-1 to 1)" },
-          suggestedMin: -1,
-          suggestedMax: 1,
-        },
-      },
-    },
-  });
-  _registerThemeRedraw("sentiment", () => renderSentimentChart(canvasId, dailyRows));
-}
-
 let _priceChartInstance = null;
 let _priceChartFullHistory = [];
 

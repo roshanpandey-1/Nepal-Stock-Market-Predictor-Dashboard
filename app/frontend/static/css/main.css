@@ -384,11 +384,6 @@ button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-of
 .breadth-table th, .breadth-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* --- News list (ShareHub "Recent News" style) --- */
-.news-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
-.news-item:last-child { border-bottom: none; }
-.news-item .headline { font-size: 0.88rem; font-weight: 500; color: var(--text); display: block; margin-bottom: 3px; }
-.news-item .headline:hover { color: var(--accent); text-decoration: none; }
-.news-item .meta { font-size: 0.74rem; color: var(--text-dim); }
 
 /* --- Chart period toggle (ShareHub-style 1D/1W/1M buttons) --- */
 .period-toggle { display: flex; gap: 4px; margin-bottom: 12px; }
@@ -582,7 +577,7 @@ button.breadth-pill:focus-visible { outline: 2px solid var(--accent); outline-of
 }
 
 
-/* Headline pager (Sentiment page) */
+/* Pager (market breadth modal) */
 .pager { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 18px; }
 .pager a, .pager span {
   min-width: 36px; padding: 6px 12px; text-align: center; border-radius: 8px;
@@ -760,8 +755,6 @@ table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: 
   table.data-table td .pts { display: block; font-size: 0.72rem; font-weight: 400; }
   table.summary-table th, table.summary-table td { padding: 9px 5px; }
 
-  .news-item { padding: 12px 0; }
-  .news-item .headline { font-size: 0.9rem; line-height: 1.4; }
   .live-badge { font-size: 0.6rem; padding: 2px 7px; }
   .period-toggle { flex-wrap: wrap; }
   .quote-price .ltp { font-size: 1.7rem; }

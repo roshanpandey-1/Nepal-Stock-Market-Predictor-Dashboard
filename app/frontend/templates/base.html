@@ -63,7 +63,6 @@
       <div class="ms-auto d-flex align-items-center gap-3">
         <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">Dashboard</a>
         <a class="nav-link {% if request.endpoint == 'main.backtest' %}active{% endif %}" href="{{ url_for('main.backtest') }}">Backtest</a>
-        <a class="nav-link {% if request.endpoint == 'main.sentiment' %}active{% endif %}" href="{{ url_for('main.sentiment') }}">Sentiment</a>
         {% if current_user %}
         <a class="nav-link {% if request.endpoint == 'acct.watchlist_page' %}active{% endif %}" href="{{ url_for('acct.watchlist_page') }}">Watchlist</a>
         <a class="nav-link {% if request.endpoint == 'acct.portfolio' %}active{% endif %}" href="{{ url_for('acct.portfolio') }}">Portfolio</a>

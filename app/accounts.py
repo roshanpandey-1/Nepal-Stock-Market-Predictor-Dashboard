@@ -1,7 +1,7 @@
 """User accounts, watchlist and portfolio.
 
 Everything here sits behind a login. Public pages (dashboard, stock pages,
-backtest, sentiment) never touch the database, so they keep working even if
+backtest) never touch the database, so they keep working even if
 the database is unreachable.
 
 Auth: email + password (hashed with werkzeug) and optional Google sign-in

@@ -15,31 +15,22 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
 </div>
 
 <div class="row g-3">
-  <div class="col-lg-8">
+  <div class="col-12">
 
     <div class="row g-3 mb-1">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <div class="stat-tile">
           <div class="label">Tickers Tracked</div>
           <div class="value">{{ num_tickers }}</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <div class="stat-tile">
           <div class="label">Sectors Modeled</div>
           <div class="value">{{ num_sectors }}</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-tile">
-          <div class="label">Market Sentiment</div>
-          <div class="value">
-            {% if latest_sentiment %}{{ "%.2f"|format(latest_sentiment.avg_sentiment|float) }}
-            {% else %}—{% endif %}
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
+      <div class="col-12 col-md-4">
         <div class="stat-tile">
           <div class="label">Best Sector (Sharpe)</div>
           <div class="value" style="font-size:1.1rem;">
@@ -159,25 +150,6 @@ Accuracy figures are out-of-sample (last 3 months held out from training).</p>
 
   </div>
 
-  <div class="col-lg-4">
-    <div class="card-panel">
-      <h3>Recent Headlines</h3>
-      {% for h in recent_headlines %}
-      <div class="news-item">
-        <a class="headline" href="{{ h.url }}" target="_blank" rel="noopener">{{ h.title }}</a>
-        <span class="meta">
-          {{ h.date }} ·
-          {% if h.finbert_label == 'positive' %}<span class="pos">Positive</span>
-          {% elif h.finbert_label == 'negative' %}<span class="neg">Negative</span>
-          {% else %}Neutral{% endif %}
-        </span>
-      </div>
-      {% else %}
-      <p class="text-dim">No headlines available.</p>
-      {% endfor %}
-      <p class="mt-2" style="font-size:0.85rem;"><a href="{{ url_for('main.sentiment') }}">View all sentiment →</a></p>
-    </div>
-  </div>
 </div>
 
 <div class="modal fade" id="breadth-modal" tabindex="-1" aria-labelledby="breadth-modal-title" aria-hidden="true">

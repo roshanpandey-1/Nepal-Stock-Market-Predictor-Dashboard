@@ -1,6 +1,6 @@
 # 🇳🇵 NEPSE Intelligence Platform
 
-**Sector-wise Buy/Sell/Hold signal models and news-sentiment analysis for the Nepal Stock Exchange, served through a live Flask dashboard.**
+**Sector-wise Buy/Sell/Hold signal models for the Nepal Stock Exchange, served through a live Flask dashboard.**
 
 [![Live Demo](https://img.shields.io/badge/demo-live-16a34a?style=flat-square)](https://nepse-intelligence-albt.onrender.com)
 [![Python](https://img.shields.io/badge/python-3.10-3776ab?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
@@ -29,13 +29,12 @@ The project covers **270 tickers across 12 sectors**, and deliberately reports i
 | 🟢 **Signal Classification** | A Buy/Sell/Hold classifier per sector — PyTorch LSTM for 7 sectors, XGBoost for Manufacturing & Processing |
 | 📊 **Out-of-Sample Backtesting** | Strategy simulation against a Buy-and-Hold benchmark on a chronological holdout, reporting return, Sharpe, max drawdown and win rate |
 | 🔍 **Why this signal?** | Each stock page has an expandable panel showing which inputs pushed the model toward Buy or Sell today. It is computed live (XGBoost TreeSHAP for Manufacturing, expected gradients for the LSTM sectors, the same method as `shap.GradientExplainer`) in `app/explain.py`, without the heavy `shap` package. It shows what the model reacted to, not whether it is right. |
-| 📰 **News Sentiment** | FinBERT (HuggingFace Transformers) scores NEPSE headlines scraped from Sharesansar, aggregated into a daily market sentiment index |
 | 📈 **Market Dashboard** | Live ticker strip, market breadth, top gainers/losers, per-stock OHLCV detail pages and interactive Chart.js price history with crosshair hover |
 | 🎨 **Light / Dark / System Themes** | Full theming across every page and chart, persisted per visitor |
 
 ## 🛠 Tech Stack
 
-**ML & Data** — `PyTorch` · `XGBoost` · `scikit-learn` · `HuggingFace Transformers (FinBERT)` · `pandas` · `NumPy`
+**ML & Data** — `PyTorch` · `XGBoost` · `scikit-learn` · `pandas` · `NumPy`
 
 **Web** — `Flask` · `Gunicorn` · `Chart.js` · `Bootstrap 5`
 
@@ -88,7 +87,7 @@ python run.py                     # → http://localhost:5000
 |---|---|
 | `python src/models/sector_trainer.py` | Train all sector models |
 | `python examples/run_backtests_oos.py` | Out-of-sample backtest across sectors |
-| `python examples/sentiment_demo.py` | Scrape + score news sentiment |
+| `python examples/sentiment_demo.py` | Scrape + score news sentiment (experiment only; not used by the site) |
 | `python examples/build_deploy_snapshot.py` | Regenerate `deploy_data/` for deployment |
 | `pytest` | Run the test suite (23 tests) |
 
@@ -139,7 +138,6 @@ Every weekly retrain now reports the **always-Hold baseline** (accuracy and macr
 
 | Workflow | Schedule | What it does |
 |---|---|---|
-| Refresh news sentiment | daily | Scrapes new headlines, scores them with FinBERT, commits `deploy_data/news` |
 | Refresh daily prices | Mon–Fri | Fetches new prices into the full-history snapshot (release `data-latest`) and refreshes `deploy_data/processed` |
 | Weekly forecasts and retraining | Saturday | Rebuilds Prophet forecasts; retrains each sector and promotes the new model only if it passes a quality gate |
 | Monthly backtest | 1st of month | Re-runs the out-of-sample backtest |
@@ -155,7 +153,7 @@ The repo splits into four parts. The folder names `app/`, `src/`, `config/`, `da
 |---|---|---|
 | **Frontend** | `app/frontend/` | `templates/` (Jinja2 pages) and `static/` (CSS, Chart.js and Plotly code, images) |
 | **Backend** | `app/*.py`, `run.py` | Flask routes, JSON API, accounts and portfolio logic, database models, e-mail, ideas and forecasts |
-| **Models and ML** | `src/`, `config/`, `examples/`, `notebooks/` | Scrapers, feature engineering, sector trainers (LSTM / XGBoost), sentiment, backtesting, and the runnable pipeline scripts |
+| **Models and ML** | `src/`, `config/`, `examples/`, `notebooks/` | Scrapers, feature engineering, sector trainers (LSTM / XGBoost), a FinBERT sentiment experiment, backtesting, and the runnable pipeline scripts |
 | **Data** | `data/`, `deploy_data/` | `data/` is the full dataset (gitignored); `deploy_data/` is the trimmed snapshot the live site reads |
 
 ```
@@ -171,11 +169,12 @@ The repo splits into four parts. The folder names `app/`, `src/`, `config/`, `da
 │   ├── insights.py           # Ideas to research, holdings forecast
 │   ├── models.py             # Database tables
 │   ├── portfolio_utils.py    # Holding valuation and today's change
-│   ├── news_utils.py  mailer.py
+│   ├── explain.py            # "Why this signal?" attributions
+│   ├── mailer.py
 ├── src/
 │   ├── scraper/              # NEPSE price and news scrapers
 │   ├── features/             # Technical indicators and labeling
-│   ├── nlp/                  # FinBERT sentiment pipeline
+│   ├── nlp/                  # FinBERT sentiment experiment (not used by the site)
 │   ├── models/               # Sector trainers and forecaster
 │   └── backtesting/          # Strategy simulation and metrics
 ├── config/                   # YAML configuration
@@ -201,7 +200,7 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for full details.
 
 - [ ] Class weighting in the training loss to address majority-class collapse
 - [ ] Automated daily data refresh (scheduled scrape → retrain → redeploy)
-- [ ] Per-ticker news sentiment (currently market-wide only)
+- [x] News sentiment decision — removed from the dashboard and the daily news job stopped (Oct 2026). Only about 5 weeks of market-wide headlines had been collected, far too little to train on or even test against 2-year models, and per-stock matching was unreliable. The FinBERT code stays in `src/nlp/` as an experiment
 - [x] Price forecast validation — `examples/validate_forecasts.py` tested Prophet on 260 stocks from 5 past start dates. No version beat simply assuming the price stays the same (30-day error 7.3% for the deployed recipe vs 5.6% for "no change"; the original full-history setup was 18.2%), so the dashboard shows it as a 30-day range of likely prices with these numbers beside it, and the portfolio Ideas tab no longer uses it
 
 ## ⚠️ Disclaimer

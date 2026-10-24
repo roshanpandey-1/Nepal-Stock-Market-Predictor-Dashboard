@@ -52,3 +52,11 @@ def test_page_still_renders_without_the_evidence_file(make_client):
     r = make_client(False).get("/backtest")
     assert r.status_code == 200
     assert "Out-of-Sample Backtest" in r.get_data(as_text=True)
+
+
+def test_sentiment_is_gone_from_the_dashboard(make_client):
+    c = make_client(True)
+    assert c.get("/sentiment").status_code == 404
+    assert c.get("/api/sentiment/NABIL").status_code == 404
+    html = c.get("/backtest").get_data(as_text=True)
+    assert ">Sentiment</a>" not in html

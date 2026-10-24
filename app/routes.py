@@ -5,16 +5,13 @@ import time
 from pathlib import Path
 from flask import Blueprint, render_template, abort, request
 
-from . import insights, news_utils
-
-HEADLINES_PER_PAGE = 25
+from . import insights
 
 main = Blueprint("main", __name__)
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 MODELS_DIR = DATA_DIR / "models"
 PROCESSED_DIR = DATA_DIR / "processed"
-NEWS_DIR = DATA_DIR / "news"
 
 CLOSE_COL_INDEX = 4  # Date,Open,High,Low,Close,... -- fixed column order
 
@@ -181,10 +178,6 @@ def dashboard():
             except (KeyError, ValueError):
                 r[k] = 0.0
     tickers = _ticker_list()
-    sentiment_rows = _read_csv(NEWS_DIR / "daily_market_sentiment.csv")
-    latest_sentiment = sentiment_rows[-1] if sentiment_rows else None
-    headlines = _read_csv(NEWS_DIR / "news_sentiment.csv")
-    recent_headlines = news_utils.recent_headlines(headlines, 6)
     gainers, losers, _ = _get_cached_movers(limit=5)
     return render_template(
         "dashboard.html",
@@ -192,8 +185,6 @@ def dashboard():
         num_sectors=len(backtest_rows),
         num_tickers=len(tickers),
         tickers=sorted(tickers),
-        latest_sentiment=latest_sentiment,
-        recent_headlines=recent_headlines,
         top_gainers=gainers,
         top_losers=losers,
     )
@@ -278,25 +269,6 @@ def stock_detail(ticker):
         quote=_latest_quote(ticker),
         has_history=True,
         forecast_evidence=insights.load_forecast_evidence(),
-    )
-
-
-@main.route("/sentiment")
-def sentiment():
-    daily_rows = _read_csv(NEWS_DIR / "daily_market_sentiment.csv")
-    all_headlines = news_utils.recent_headlines(_read_csv(NEWS_DIR / "news_sentiment.csv"))
-    total = len(all_headlines)
-    pages = max(1, -(-total // HEADLINES_PER_PAGE))  # ceil division
-    page = min(max(request.args.get("page", 1, type=int), 1), pages)
-    first = (page - 1) * HEADLINES_PER_PAGE
-    return render_template(
-        "sentiment.html",
-        daily_rows=daily_rows,
-        headlines=all_headlines[first:first + HEADLINES_PER_PAGE],
-        page=page, pages=pages, total=total,
-        first_shown=first + 1 if total else 0,
-        last_shown=min(first + HEADLINES_PER_PAGE, total),
-        page_numbers=news_utils.page_window(page, pages),
     )
 
 

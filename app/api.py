@@ -16,7 +16,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify
 
-from . import explain, model_evidence, news_utils
+from . import explain, model_evidence
 
 api = Blueprint("api", __name__)
 
@@ -24,7 +24,6 @@ import os
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 MODELS_DIR = DATA_DIR / "models"
 PROCESSED_DIR = DATA_DIR / "processed"
-NEWS_DIR = DATA_DIR / "news"
 
 SEQ_LEN = 10
 DROP_COLS = {"Date", "Open", "High", "Low", "Close", "Volume", "Trades",
@@ -315,32 +314,6 @@ def explain_signal(ticker):
     return jsonify(out)
 
 
-@api.route("/sentiment/<ticker>")
-def sentiment(ticker):
-    """Sentiment here is market-wide, not per-ticker -- per-stock news
-    matching was tried during scraping and found unreliable (see
-    src/nlp/sentiment_analyzer.py), so this returns the overall market
-    sentiment trend and recent headlines rather than fabricating a
-    ticker-specific score."""
-    ticker = ticker.upper()
-    daily_path = NEWS_DIR / "daily_market_sentiment.csv"
-    news_path = NEWS_DIR / "news_sentiment.csv"
-    daily = []
-    if daily_path.exists():
-        with open(daily_path, newline="", encoding="utf-8") as f:
-            daily = list(csv.DictReader(f))
-    headlines = []
-    if news_path.exists():
-        with open(news_path, newline="", encoding="utf-8") as f:
-            headlines = list(csv.DictReader(f))
-    return jsonify({
-        "ticker": ticker,
-        "scope": "market_wide",
-        "daily_sentiment": daily[-30:],
-        "recent_headlines": news_utils.recent_headlines(headlines, 10),
-    })
-
-
 @api.route("/market/overview")
 def market_overview():
     ticker_list_path = PROCESSED_DIR / "ticker_list.txt"
@@ -354,18 +327,10 @@ def market_overview():
         with open(backtest_path, newline="", encoding="utf-8") as f:
             sectors = list(csv.DictReader(f))
 
-    daily_path = NEWS_DIR / "daily_market_sentiment.csv"
-    latest_sentiment = None
-    if daily_path.exists():
-        with open(daily_path, newline="", encoding="utf-8") as f:
-            rows = list(csv.DictReader(f))
-            latest_sentiment = rows[-1] if rows else None
-
     return jsonify({
         "num_tickers": len(tickers),
         "num_sectors": len(sectors),
         "sectors": [s["sector"] for s in sectors],
-        "latest_market_sentiment": latest_sentiment,
     })
 
 

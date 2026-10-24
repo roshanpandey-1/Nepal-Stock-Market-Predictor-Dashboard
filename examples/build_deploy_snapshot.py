@@ -1,6 +1,6 @@
 """
-Builds deploy_data/ -- a trimmed snapshot of data/processed, data/models,
-and data/news, small enough to commit to git for a live deployment (the
+Builds deploy_data/ -- a trimmed snapshot of data/processed and data/models,
+small enough to commit to git for a live deployment (the
 full data/ directories are gitignored; see deploy_data/README.md for why).
 
 Run this again any time the data pipeline / models are refreshed and you
@@ -14,12 +14,10 @@ from pathlib import Path
 
 PROCESSED = Path("data/processed")
 MODELS = Path("data/models")
-NEWS = Path("data/news")
 
 OUT = Path("deploy_data")
 OUT_PROCESSED = OUT / "processed"
 OUT_MODELS = OUT / "models"
-OUT_NEWS = OUT / "news"
 
 KEEP_ROWS = 260  # ~180 for the price chart + headroom for the LSTM's lookback
 
@@ -66,22 +64,13 @@ def build_models():
     print(f"Copied {count} model/scaler/metadata files")
 
 
-def build_news():
-    OUT_NEWS.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for src in NEWS.glob("*.csv"):
-        shutil.copy(src, OUT_NEWS / src.name)
-        count += 1
-    print(f"Copied {count} news CSV files")
-
-
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["processed", "models", "news"],
+    ap.add_argument("--only", choices=["processed", "models"],
                     help="rebuild just one part (CI jobs refresh one part at a time)")
     args = ap.parse_args()
-    steps = {"processed": build_processed, "models": build_models, "news": build_news}
+    steps = {"processed": build_processed, "models": build_models}
     for name, fn in steps.items():
         if args.only in (None, name):
             fn()
