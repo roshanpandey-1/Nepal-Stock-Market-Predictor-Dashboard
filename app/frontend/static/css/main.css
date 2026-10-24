@@ -866,3 +866,14 @@ table.data-table tfoot td { border-top: 2px solid var(--border); border-bottom: 
   #pf-forecast .card-panel { padding: 16px 14px; }
   .fc-table th, .fc-table td { padding: 11px 10px; }
 }
+
+/* --- "Why this signal?" panel --- */
+#explain-details > summary { cursor: pointer; list-style-position: inside; }
+.ex-row { display: grid; grid-template-columns: minmax(150px, 1.4fr) 2fr 110px; gap: 10px; align-items: center; padding: 5px 0; font-size: 0.85rem; }
+.ex-bar { position: relative; height: 12px; background: var(--border); border-radius: 6px; overflow: hidden; }
+.ex-fill { position: absolute; top: 0; bottom: 0; }
+.ex-fill.buy  { left: 50%; background: var(--green); border-radius: 0 6px 6px 0; }
+.ex-fill.sell { right: 50%; background: var(--red);   border-radius: 6px 0 0 6px; }
+.ex-bar::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--text-dim); opacity: 0.6; }
+.ex-share { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
+@media (max-width: 575.98px) { .ex-row { grid-template-columns: 1fr; gap: 3px; } }

@@ -1578,3 +1578,56 @@ async function initForecast(ticker) {
     panel.style.display = "none";
   }
 }
+
+// --- "Why this signal?" panel -------------------------------------------------
+// Fetched only when the viewer opens the panel (the explanation is computed live
+// on the server, so there is no reason to pay for it on every page view).
+function _renderExplain(d) {
+  const body = document.getElementById("explain-body");
+  if (!body) return;
+  if (!d || d.error) {
+    body.innerHTML = `<span class="text-dim">${_escapeHTML((d && d.error) || "Explanation unavailable.")}</span>`;
+    return;
+  }
+  const rel = d.reliability || null;
+  const maxAbs = Math.max(...d.drivers.map(x => Math.abs(x.effect)), 1e-9);
+  const rows = d.drivers.map(x => {
+    const w = Math.round(48 * Math.abs(x.effect) / maxAbs);
+    const side = x.toward === "Buy" ? "buy" : "sell";
+    const val = x.value === null ? "" : ` <span class="text-dim">(${_escapeHTML(String(x.value))})</span>`;
+    return `<div class="ex-row">
+      <div class="ex-name">${_escapeHTML(x.label)}${val}</div>
+      <div class="ex-bar"><span class="ex-fill ${side}" style="width:${w}%"></span></div>
+      <div class="ex-share">${x.toward === "Buy" ? "&rarr; Buy" : "&rarr; Sell"} &middot; ${x.share_pct.toFixed(0)}%</div>
+    </div>`;
+  }).join("");
+  body.innerHTML =
+    (rel ? `<div class="limitation-note" style="margin-bottom:12px;"><strong>${_escapeHTML(rel.headline)}</strong>
+       This panel shows what the model reacted to, not whether it is right. ${_escapeHTML(rel.caveat)}</div>` : "") +
+    `<p class="text-dim" style="font-size:0.85rem;">The model's score for today is
+       <strong>${d.score.toFixed(2)}</strong> (Buy minus Sell; a typical day is ${d.baseline.toFixed(2)}).
+       Above zero leans Buy, below zero leans Sell, and near zero the two cancel out, which is why the signal is Hold.
+       Bars show how much each input moved the score compared with ${_escapeHTML(d.compared_with)}.
+       Percentages are each input's share of the total movement across all inputs; the top ${d.drivers.length} are shown.</p>` +
+    `<div class="ex-list">${rows}</div>` +
+    `<p class="text-dim" style="font-size:0.75rem; margin-top:8px;">${_escapeHTML(d.model_type)} model for ${_escapeHTML(d.sector)},
+       data as of ${_escapeHTML(d.as_of)}. Computed with ${d.method === "tree_shap" ? "TreeSHAP" : "expected gradients (the SHAP gradient method)"}.
+       Several inputs measure nearly the same thing (for example the different moving averages), so their effects overlap.</p>`;
+}
+
+function initExplain() {
+  const el = document.getElementById("explain-details");
+  if (!el) return;
+  let started = false;
+  el.addEventListener("toggle", async () => {
+    if (!el.open || started) return;
+    started = true;
+    try {
+      const r = await fetch(`/api/explain/${encodeURIComponent(el.dataset.ticker)}`);
+      _renderExplain(await r.json());
+    } catch (e) {
+      started = false;
+      _renderExplain({ error: "Could not load the explanation. Close and reopen to retry." });
+    }
+  });
+}

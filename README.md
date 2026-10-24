@@ -28,6 +28,7 @@ The project covers **270 tickers across 12 sectors**, and deliberately reports i
 |---|---|
 | 🟢 **Signal Classification** | A Buy/Sell/Hold classifier per sector — PyTorch LSTM for 7 sectors, XGBoost for Manufacturing & Processing |
 | 📊 **Out-of-Sample Backtesting** | Strategy simulation against a Buy-and-Hold benchmark on a chronological holdout, reporting return, Sharpe, max drawdown and win rate |
+| 🔍 **Why this signal?** | Each stock page has an expandable panel showing which inputs pushed the model toward Buy or Sell today. It is computed live (XGBoost TreeSHAP for Manufacturing, expected gradients for the LSTM sectors, the same method as `shap.GradientExplainer`) in `app/explain.py`, without the heavy `shap` package. It shows what the model reacted to, not whether it is right. |
 | 📰 **News Sentiment** | FinBERT (HuggingFace Transformers) scores NEPSE headlines scraped from Sharesansar, aggregated into a daily market sentiment index |
 | 📈 **Market Dashboard** | Live ticker strip, market breadth, top gainers/losers, per-stock OHLCV detail pages and interactive Chart.js price history with crosshair hover |
 | 🎨 **Light / Dark / System Themes** | Full theming across every page and chart, persisted per visitor |
