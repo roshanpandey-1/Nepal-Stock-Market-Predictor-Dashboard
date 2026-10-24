@@ -1,0 +1,211 @@
+{
+ "generated": "2026-10-24",
+ "verdict": "no_trading_edge",
+ "headline": "The models show a small but real ability to rank stocks, not an ability to make money after NEPSE costs.",
+ "ic_note": "Signal strength is a rank correlation (IC): on each day, how well the model's Buy-minus-Sell score ordered the stocks of a sector by next-day return. 0 means no information. Values near +0.03 are small.",
+ "tests": [
+  {
+   "name": "Test 1 - models deployed until 24 Oct 2026",
+   "period": "16 Jul to 16 Oct 2026 (about 79 trading days), 270 stocks, data the models never saw",
+   "ic": 0.036,
+   "ic_ci": [
+    0.014,
+    0.062
+   ],
+   "s1": 11.3,
+   "s1_ci": [
+    -11.8,
+    29.4
+   ],
+   "s2": -1.7,
+   "s2_ci": [
+    -7.4,
+    4.7
+   ],
+   "s2_gross": 3.7,
+   "s2_gross_ci": [
+    -2.0,
+    10.0
+   ],
+   "note": "The market fell over this window, so a model that mostly sat in cash looked good. The gain is within noise. On 24 Oct the weekly retrain replaced the Microfinance, Life Insurance, Non Life Insurance, Others and Tradings models; the new ones have not been through this test yet."
+  },
+  {
+   "name": "Test 2 - retrained on the past",
+   "period": "Oct 2024 to Mar 2026, six quarters, each scored by models trained only on the 2 years before it (332 trading days, 260 stocks)",
+   "ic": 0.0263,
+   "ic_ci": [
+    0.015,
+    0.0373
+   ],
+   "s1": -1.7,
+   "s1_ci": [
+    -9.5,
+    6.0
+   ],
+   "s2": -6.1,
+   "s2_ci": [
+    -9.0,
+    -2.5
+   ],
+   "s2_gross": 0.7,
+   "s2_gross_ci": [
+    -2.4,
+    3.9
+   ],
+   "note": "Signal positive in 5 of 6 quarters, but trading it loses money after costs."
+  }
+ ],
+ "xgb": {
+  "ic": 0.0347,
+  "ic_ci": [
+   0.0219,
+   0.0457
+  ],
+  "lstm_ic": 0.0196,
+  "s2": -9.6,
+  "s2_ci": [
+   -12.8,
+   -6.6
+  ],
+  "note": "A tree-based model (XGBoost) ranked stocks somewhat better than the neural network in the 11 non-Manufacturing sectors, but it trades more often and loses more to costs. Research result only; the live models are unchanged."
+ },
+ "sectors": [
+  {
+   "sector": "Manufacturing And Processing",
+   "a_ic": 0.0675,
+   "a_lo": -0.0072,
+   "a_hi": 0.1742,
+   "b_ic": 0.0939,
+   "b_lo": 0.0529,
+   "b_hi": 0.1398,
+   "b_pos": "5 of 6",
+   "x_ic": 0.0939,
+   "verdict": "clear"
+  },
+  {
+   "sector": "Hotels And Tourism",
+   "a_ic": 0.0098,
+   "a_lo": -0.0946,
+   "a_hi": 0.0808,
+   "b_ic": 0.0426,
+   "b_lo": -0.0068,
+   "b_hi": 0.0826,
+   "b_pos": "5 of 6",
+   "x_ic": 0.033,
+   "verdict": "unclear"
+  },
+  {
+   "sector": "Microfinance",
+   "a_ic": 0.0581,
+   "a_lo": 0.0324,
+   "a_hi": 0.0827,
+   "b_ic": 0.038,
+   "b_lo": 0.0202,
+   "b_hi": 0.0538,
+   "b_pos": "6 of 6",
+   "x_ic": 0.0757,
+   "verdict": "clear"
+  },
+  {
+   "sector": "Hydro Power",
+   "a_ic": 0.0776,
+   "a_lo": 0.0444,
+   "a_hi": 0.1094,
+   "b_ic": 0.0336,
+   "b_lo": 0.0186,
+   "b_hi": 0.0481,
+   "b_pos": "5 of 6",
+   "x_ic": 0.0707,
+   "verdict": "clear"
+  },
+  {
+   "sector": "Non Life Insurance",
+   "a_ic": 0.0429,
+   "a_lo": -0.0152,
+   "a_hi": 0.1144,
+   "b_ic": 0.0318,
+   "b_lo": 0.0032,
+   "b_hi": 0.0591,
+   "b_pos": "5 of 6",
+   "x_ic": 0.0166,
+   "verdict": "clear"
+  },
+  {
+   "sector": "Commercial Banks",
+   "a_ic": 0.0123,
+   "a_lo": -0.044,
+   "a_hi": 0.0668,
+   "b_ic": 0.0234,
+   "b_lo": -0.007,
+   "b_hi": 0.0501,
+   "b_pos": "5 of 6",
+   "x_ic": 0.0199,
+   "verdict": "unclear"
+  },
+  {
+   "sector": "Life Insurance",
+   "a_ic": 0.0695,
+   "a_lo": 0.0165,
+   "a_hi": 0.1319,
+   "b_ic": 0.0202,
+   "b_lo": -0.0152,
+   "b_hi": 0.0571,
+   "b_pos": "5 of 6",
+   "x_ic": 0.0202,
+   "verdict": "unclear"
+  },
+  {
+   "sector": "Investment",
+   "a_ic": 0.0661,
+   "a_lo": -0.0586,
+   "a_hi": 0.1692,
+   "b_ic": 0.0117,
+   "b_lo": -0.0303,
+   "b_hi": 0.0623,
+   "b_pos": "4 of 6",
+   "x_ic": 0.0459,
+   "verdict": "unclear"
+  },
+  {
+   "sector": "Development Banks",
+   "a_ic": 0.0971,
+   "a_lo": 0.0232,
+   "a_hi": 0.1741,
+   "b_ic": 0.0062,
+   "b_lo": -0.0293,
+   "b_hi": 0.0429,
+   "b_pos": "4 of 6",
+   "x_ic": 0.0095,
+   "verdict": "unclear"
+  },
+  {
+   "sector": "Finance",
+   "a_ic": -0.0544,
+   "a_lo": -0.1042,
+   "a_hi": -0.0114,
+   "b_ic": 0.0051,
+   "b_lo": -0.022,
+   "b_hi": 0.032,
+   "b_pos": "3 of 6",
+   "x_ic": 0.0531,
+   "verdict": "unclear"
+  },
+  {
+   "sector": "Others",
+   "a_ic": 0.0044,
+   "a_lo": -0.0741,
+   "a_hi": 0.1142,
+   "b_ic": -0.017,
+   "b_lo": -0.0736,
+   "b_hi": 0.04,
+   "b_pos": "2 of 6",
+   "x_ic": 0.0027,
+   "verdict": "unclear"
+  }
+ ],
+ "costs": "Costs used: broker commission 0.33% and SEBON 0.015% per side, Rs 25 DP charge per sale. Capital-gains tax (10%) is deducted only in the Buy/Sell-rule result; the weekly-ranking result includes fees but no tax, which flatters it. Fees come from public NEPSE schedules; check with your broker.",
+ "definitions": {
+  "s1": "Following the Buy/Sell signals stock by stock, versus simply holding the stock",
+  "s2": "Each week holding the 20% of a sector the model likes most, versus holding the whole sector equally"
+ }
+}

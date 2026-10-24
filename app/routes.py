@@ -299,6 +299,15 @@ def sentiment():
     )
 
 
+def _signal_evidence():
+    """Honest signal tests (models/signal_evidence.json); None if the file is missing."""
+    path = MODELS_DIR / "signal_evidence.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 @main.route("/backtest")
 def backtest():
     rows = _read_csv(MODELS_DIR / "backtest_summary_oos.csv")
@@ -313,4 +322,4 @@ def backtest():
             r["num_trades"] = int(float(r["num_trades"]))
         except (KeyError, ValueError):
             r["num_trades"] = 0
-    return render_template("backtest.html", rows=rows)
+    return render_template("backtest.html", rows=rows, evidence=_signal_evidence())

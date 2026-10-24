@@ -2,10 +2,83 @@
 {% block title %}Backtest · NEPSE Intelligence{% endblock %}
 {% block content %}
 
+<h1>How well do the signals really work?</h1>
+
+{% if evidence %}
+<div class="limitation-note evidence-verdict">
+  <strong>Short answer:</strong> {{ evidence.headline }}
+</div>
+<p class="text-dim">{{ evidence.ic_note }} The ranges in brackets are 95% confidence ranges; if a range includes 0,
+the result could be luck. Money results are average extra return per day, in basis points (1 bp = 0.01%), after
+NEPSE costs, against the benchmark named in the table notes.</p>
+
+<div class="card-panel">
+  <div class="table-scroll">
+  <table class="data-table">
+    <thead>
+      <tr><th>Test</th><th>Signal strength</th><th>Buy/Sell rule vs holding</th><th>Weekly top 20% vs sector</th><th>Same, before costs</th></tr>
+    </thead>
+    <tbody>
+      {% for t in evidence.tests %}
+      <tr>
+        <td><strong>{{ t.name }}</strong><br><span class="text-dim">{{ t.period }}</span></td>
+        <td class="{{ 'pos' if t.ic_ci[0] > 0 else '' }}">{{ '%+.3f'|format(t.ic) }}<br><span class="text-dim">[{{ '%+.3f'|format(t.ic_ci[0]) }}, {{ '%+.3f'|format(t.ic_ci[1]) }}]</span></td>
+        <td>{{ '%+.1f'|format(t.s1) }} bp<br><span class="text-dim">[{{ '%+.1f'|format(t.s1_ci[0]) }}, {{ '%+.1f'|format(t.s1_ci[1]) }}]</span></td>
+        <td class="{{ 'neg' if t.s2_ci[1] < 0 else '' }}">{{ '%+.1f'|format(t.s2) }} bp<br><span class="text-dim">[{{ '%+.1f'|format(t.s2_ci[0]) }}, {{ '%+.1f'|format(t.s2_ci[1]) }}]</span></td>
+        <td>{{ '%+.1f'|format(t.s2_gross) }} bp<br><span class="text-dim">[{{ '%+.1f'|format(t.s2_gross_ci[0]) }}, {{ '%+.1f'|format(t.s2_gross_ci[1]) }}]</span></td>
+      </tr>
+      <tr><td colspan="5" class="text-dim">{{ t.note }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="text-dim rel-text">Buy/Sell rule: {{ evidence.definitions.s1 }}. Weekly top 20%: {{ evidence.definitions.s2 }}.
+  Before-costs column uses the weekly top-20% method. {{ evidence.costs }}</p>
+</div>
+
+<h2 class="h5 mt-4">Signal strength by sector</h2>
+<p class="text-dim">"Clear" means the signal was above zero with its range clear of zero and positive in at least 5 of 6 past
+quarters. Most sectors are "unclear": a small positive number we cannot tell apart from luck.</p>
+<div class="card-panel">
+  <div class="table-scroll">
+  <table class="data-table">
+    <thead>
+      <tr><th>Sector</th><th>Past six quarters</th><th>Quarters positive</th><th>Deployed models (Test 1)</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      {% for s in evidence.sectors %}
+      <tr>
+        <td>{{ s.sector }}</td>
+        <td class="{{ 'pos' if s.b_lo > 0 else '' }}">{{ '%+.3f'|format(s.b_ic) }} <span class="text-dim">[{{ '%+.3f'|format(s.b_lo) }}, {{ '%+.3f'|format(s.b_hi) }}]</span></td>
+        <td>{{ s.b_pos }}</td>
+        <td>{{ '%+.3f'|format(s.a_ic) }} <span class="text-dim">[{{ '%+.3f'|format(s.a_lo) }}, {{ '%+.3f'|format(s.a_hi) }}]</span></td>
+        <td><span class="rel-chip {{ 'lvl-tested' if s.verdict == 'clear' else 'lvl-unproven' }}">{{ 'Small real signal' if s.verdict == 'clear' else 'Unclear' }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="text-dim rel-text">Tradings (2 stocks) is too small to test. Even the "small real signal" sectors do not
+  make money after costs; a signal worth +0.03 to +0.09 is far too weak to cover brokerage and tax.</p>
+</div>
+
+<div class="limitation-note">
+  <strong>Side experiment:</strong> {{ evidence.xgb.note }} Signal strength {{ '%+.3f'|format(evidence.xgb.ic) }}
+  [{{ '%+.3f'|format(evidence.xgb.ic_ci[0]) }}, {{ '%+.3f'|format(evidence.xgb.ic_ci[1]) }}] against
+  {{ '%+.3f'|format(evidence.xgb.lstm_ic) }} for the neural network; weekly top-20% result
+  {{ '%+.1f'|format(evidence.xgb.s2) }} bp after costs.
+</div>
+
+<h2 class="h5 mt-4">Single-stock demonstration</h2>
+<p class="text-dim">The chart and table below apply each sector's model to <em>one</em> stock over the last 3 months and compare
+it with holding that stock. One stock over one short window proves very little; treat it as an illustration, not as evidence.
+The tests above are the evidence.</p>
+{% else %}
 <h1>Out-of-Sample Backtest</h1>
 <p class="text-dim">Each sector's saved model was applied to its most-complete ticker over a holdout period
 (last 3 months, never seen during training) and compared against a simple Buy-and-Hold benchmark starting
 from the same date, with 100,000 in simulated capital.</p>
+{% endif %}
 
 <div class="card-panel">
   <div class="chart-box tall"><canvas id="backtest-chart"></canvas></div>
@@ -42,7 +115,7 @@ from the same date, with 100,000 in simulated capital.</p>
 </div>
 
 <div class="limitation-note">
-  ⚠️ Several rows show 0 trades and a flat 0% return — that's the model predicting "Hold" for the entire
+  Several rows show 0 trades and a flat 0% return — that's the model predicting "Hold" for the entire
   holdout window rather than a data problem. See the README's Known Limitations section.
 </div>
 
