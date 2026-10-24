@@ -349,9 +349,18 @@ function setSignalBadge(signalData) {
   }
 
   const cls = { Buy: "badge-buy", Sell: "badge-sell", Hold: "badge-hold" }[signalData.signal] || "badge-hold";
-  badge.innerHTML = `<span class="badge-pill ${cls}">${signalData.signal}</span>`;
+  const rel = signalData.reliability || null;
+  const level = rel ? rel.level : "unknown";
+  // A Hold from a model that says Hold almost every day is not a real call, so it is shown muted.
+  const muted = level === "no_edge" ? " is-muted" : "";
+  badge.innerHTML = `<span class="badge-pill ${cls}${muted}">${_escapeHTML(signalData.signal)}</span>` +
+    (rel ? ` <span class="rel-chip lvl-${_escapeHTML(level)}" title="${_escapeHTML(rel.caveat)}">${_escapeHTML(rel.label)}</span>` : "");
   if (conf) {
-    conf.textContent = `Confidence: ${(signalData.confidence * 100).toFixed(1)}%  ·  ${signalData.note || ""}`;
+    const p = signalData.probabilities || {};
+    const probs = ["Sell", "Hold", "Buy"].filter(k => k in p).map(k => `${k} ${(p[k] * 100).toFixed(0)}%`).join(" · ");
+    conf.innerHTML =
+      (probs ? `<div>Model probabilities: ${_escapeHTML(probs)}</div>` : "") +
+      (rel ? `<div class="rel-text lvl-${_escapeHTML(level)}"><strong>${_escapeHTML(rel.headline)}</strong> ${_escapeHTML(rel.caveat)}</div>` : "");
   }
 }
 

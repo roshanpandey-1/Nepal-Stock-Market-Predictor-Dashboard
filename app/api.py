@@ -4,9 +4,10 @@ JSON API for the dashboard's charts and live signal lookups.
 All model inference here mirrors examples/run_backtests_oos.py: it loads the
 same *_oos LSTM/XGBoost models trained on a chronological 2-year window with
 the last 3 months held out, and applies them to a ticker's latest feature
-row(s). See README.md "Known limitation" section -- 6 of 8 sector models
-default heavily to Hold on unseen data, so a Buy/Sell signal here should be
-read with that caveat, not as a confident trading recommendation.
+row(s). See README.md "Known limitation" section -- many sector models
+default heavily to Hold on unseen data, so every /signal response carries a
+"reliability" verdict (see model_evidence.py) built from that sector's latest
+holdout test, and a Buy/Sell/Hold here is not a confident trading recommendation.
 """
 import csv
 import pickle
@@ -14,7 +15,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify
 
-from . import news_utils
+from . import model_evidence, news_utils
 
 api = Blueprint("api", __name__)
 
@@ -210,13 +211,15 @@ def signal(ticker):
             pred = int(model.predict([latest])[0])
             probs = [float(p) for p in model.predict_proba([latest])[0]]
 
+        reliability = model_evidence.assess(model_evidence.for_sector(sector))
         return jsonify({
             "ticker": ticker,
             "sector": sector,
             "signal": LABELS[pred],
             "confidence": round(max(probs), 4),
             "probabilities": {LABELS[i]: round(p, 4) for i, p in enumerate(probs)},
-            "note": "Out-of-sample model; several sectors default heavily to Hold -- see README Known Limitations.",
+            "reliability": reliability,
+            "note": reliability["headline"],
         })
     except Exception as e:
         return jsonify({"ticker": ticker, "sector": sector, "signal": None, "error": str(e)}), 500

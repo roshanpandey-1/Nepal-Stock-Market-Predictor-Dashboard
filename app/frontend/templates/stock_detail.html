@@ -75,8 +75,9 @@
   <div class="col-12 col-md-8">
     <div class="limitation-note" style="margin-bottom:0;">
       This signal comes from the sector's out-of-sample model (see <a href="{{ url_for('main.backtest') }}">Backtest</a>).
-      For most sectors it currently leans heavily toward "Hold" on unseen data — treat it as illustrative, not
-      as trading advice.
+      The tag next to it says how that model did on data it had never seen, compared with simply guessing "Hold"
+      every day. Right now no sector's model clearly beats that baseline, so treat every signal as illustrative,
+      not as trading advice.
     </div>
   </div>
 </div>

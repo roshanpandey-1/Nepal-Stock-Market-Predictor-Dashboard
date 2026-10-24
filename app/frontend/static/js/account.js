@@ -44,8 +44,13 @@ async function _fillSignals(root) {
   await Promise.all([...cells].map(async (el) => {
     const d = await _loadSignal(el.dataset.signalFor);
     if (!d || !d.signal) { el.innerHTML = `<span class="text-dim">—</span>`; return; }
+    const rel = d.reliability || null;
+    const tip = rel ? _esc(`${rel.label}: ${rel.headline} ${rel.caveat}`) : `Confidence ${(d.confidence * 100).toFixed(0)}%`;
+    // A model that says Hold almost every day gives no information, so show "No signal", not a Hold badge.
+    if (rel && rel.level === "no_edge") { el.innerHTML = `<span class="text-dim rel-none" title="${tip}">No signal</span>`; return; }
     const cls = { Buy: "badge-buy", Sell: "badge-sell", Hold: "badge-hold" }[d.signal] || "badge-hold";
-    el.innerHTML = `<span class="badge-pill sm ${cls}" title="Confidence ${(d.confidence * 100).toFixed(0)}%">${d.signal}</span>`;
+    const flag = rel && rel.level !== "tested" ? ` <span class="rel-q" title="${tip}">?</span>` : "";
+    el.innerHTML = `<span class="badge-pill sm ${cls}" title="${tip}">${_esc(d.signal)}</span>${flag}`;
   }));
 }
 
