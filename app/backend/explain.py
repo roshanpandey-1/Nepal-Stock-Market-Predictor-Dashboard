@@ -33,6 +33,22 @@ import numpy as np
 
 BUY, SELL = 2, 0   # class indices used everywhere: 0 Sell, 1 Hold, 2 Buy
 
+# The sector models' inputs, shared with api.py (/api/signal). Kept here because this
+# module must not import Flask or anything from the app package: GitHub Actions run
+# scripts/build_explanations.py without the web dependencies installed.
+SEQ_LEN = 10
+DROP_COLS = {"Date", "Open", "High", "Low", "Close", "Volume", "Trades",
+             "Turnover", "Ticker", "Label", "Future_Return", "Sector"}
+LSTM_SECTORS = {"Hydro Power", "Microfinance", "Commercial Banks",
+                "Development Banks", "Finance", "Life Insurance",
+                "Non Life Insurance",
+                # Added for learning/coverage purposes -- these 4 collapse to
+                # "Hold" even more heavily than the original 8 (0 trades on
+                # the chronological OOS holdout for the representative
+                # ticker in each). Kept in for completeness, not because
+                # the signal is trustworthy -- see README Known Limitations.
+                "Hotels And Tourism", "Investment", "Others", "Tradings"}
+
 _LABELS = {
     "SMA_7": "7-day average price", "SMA_21": "21-day average price", "SMA_50": "50-day average price",
     "EMA_12": "12-day weighted average price", "EMA_26": "26-day weighted average price",
@@ -136,7 +152,8 @@ EXPLANATIONS_FILE = "explanations.json"
 BACKGROUND_DAYS = 60   # earlier days the LSTM explanation compares today against
 
 
-def explain_ticker(rows, models_dir, drop_cols, lstm_sectors, seq_len=10, labels=("Sell", "Hold", "Buy")):
+def explain_ticker(rows, models_dir, drop_cols=DROP_COLS, lstm_sectors=LSTM_SECTORS, seq_len=SEQ_LEN,
+                   labels=("Sell", "Hold", "Buy")):
     """Explanation payload for one stock's feature rows (list of CSV dicts), or {"error": ...}.
 
     Uses the same saved model and the same latest rows as /api/signal.

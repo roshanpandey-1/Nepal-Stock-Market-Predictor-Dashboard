@@ -56,11 +56,10 @@ def test_top_drivers_orders_by_size_and_names_direction():
 def test_explain_ticker_with_the_deployed_models(ticker, model_type):
     pytest.importorskip("torch")
     import csv
-    from app.backend.api import DROP_COLS, LSTM_SECTORS, SEQ_LEN
     data = REPO / "deploy_data"
     with open(data / "processed" / f"{ticker}_features.csv", newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    d = explain.explain_ticker(rows, data / "models", DROP_COLS, LSTM_SECTORS, SEQ_LEN)
+    d = explain.explain_ticker(rows, data / "models")
     assert d["model_type"] == model_type and d["signal"] in ("Buy", "Sell", "Hold")
     assert len(d["drivers"]) == 8 and sum(x["share_pct"] for x in d["drivers"]) <= 100.01
     assert d["as_of"] == rows[-1]["Date"]
@@ -100,6 +99,33 @@ def test_shipped_explanations_cover_every_stock():
     shipped = json.loads((data / "models" / "explanations.json").read_text(encoding="utf-8"))
     tickers = [t for t in (data / "processed" / "ticker_list.txt").read_text().split() if t]
     assert set(tickers) <= set(shipped["stocks"])
+
+
+def test_build_script_runs_without_flask(tmp_path):
+    """GitHub Actions run scripts/build_explanations.py without the web dependencies."""
+    pytest.importorskip("torch")
+    import json
+    import shutil
+    import subprocess
+    import sys
+    src = REPO / "deploy_data"
+    (tmp_path / "processed").mkdir()
+    (tmp_path / "models").mkdir()
+    (tmp_path / "processed" / "ticker_list.txt").write_text("CHCL\nHDL\n")
+    for t in ("CHCL", "HDL"):
+        shutil.copy(src / "processed" / f"{t}_features.csv", tmp_path / "processed")
+    for f in ("Hydro_Power_lstm_model_oos.pth", "Hydro_Power_scaler_oos.pkl",
+              "Manufacturing_And_Processing_xgb_model_oos.pkl"):
+        shutil.copy(src / "models" / f, tmp_path / "models")
+    block_web = ("import sys, runpy\n"
+                 "for m in ('flask', 'flask_sqlalchemy', 'flask_cors', 'authlib', 'sqlalchemy'):\n"
+                 "    sys.modules[m] = None\n"
+                 f"sys.argv = ['build_explanations.py', '--data-dir', {str(tmp_path)!r}]\n"
+                 f"runpy.run_path({str(REPO / 'scripts' / 'build_explanations.py')!r}, run_name='__main__')\n")
+    r = subprocess.run([sys.executable, "-c", block_web], cwd=REPO, capture_output=True, text=True, timeout=300)
+    assert r.returncode == 0, r.stderr[-2000:]
+    out = json.loads((tmp_path / "models" / "explanations.json").read_text(encoding="utf-8"))
+    assert out["stocks"]["CHCL"]["model_type"] == "LSTM" and out["stocks"]["HDL"]["model_type"] == "XGBoost"
 
 
 def test_explain_unknown_ticker_is_404(client):

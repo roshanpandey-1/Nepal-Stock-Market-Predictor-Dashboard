@@ -21,10 +21,15 @@ import time
 from datetime import date
 from pathlib import Path
 
-sys.path.append('.')
+import importlib.util
 
-from app.backend import explain  # noqa: E402
-from app.backend.api import DROP_COLS, LSTM_SECTORS, SEQ_LEN  # noqa: E402
+# Load explain.py on its own, not through the app package: importing app/ runs
+# app/__init__.py, which needs Flask, and the GitHub Actions jobs that run this
+# script do not install the web dependencies.
+_spec = importlib.util.spec_from_file_location(
+    'explain', Path(__file__).resolve().parents[1] / 'app' / 'backend' / 'explain.py')
+explain = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(explain)
 
 
 def main():
@@ -44,7 +49,7 @@ def main():
         with open(path, newline='', encoding='utf-8') as f:
             rows = list(csv.DictReader(f))
         try:
-            stocks[ticker] = explain.explain_ticker(rows, data / 'models', DROP_COLS, LSTM_SECTORS, SEQ_LEN)
+            stocks[ticker] = explain.explain_ticker(rows, data / 'models')
         except Exception as e:  # one bad stock must not stop the rest
             stocks[ticker] = {'error': f'could not explain: {type(e).__name__}'}
         failed += 'error' in stocks[ticker]

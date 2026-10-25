@@ -24,18 +24,10 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 MODELS_DIR = DATA_DIR / "models"
 PROCESSED_DIR = DATA_DIR / "processed"
 
-SEQ_LEN = 10
-DROP_COLS = {"Date", "Open", "High", "Low", "Close", "Volume", "Trades",
-             "Turnover", "Ticker", "Label", "Future_Return", "Sector"}
-LSTM_SECTORS = {"Hydro Power", "Microfinance", "Commercial Banks",
-                "Development Banks", "Finance", "Life Insurance",
-                "Non Life Insurance",
-                # Added for learning/coverage purposes -- these 4 collapse to
-                # "Hold" even more heavily than the original 8 (0 trades on
-                # the chronological OOS holdout for the representative
-                # ticker in each). Kept in for completeness, not because
-                # the signal is trustworthy -- see README Known Limitations.
-                "Hotels And Tourism", "Investment", "Others", "Tradings"}
+# Model inputs (feature columns, LSTM sectors, window length) are defined once in
+# explain.py, which must stay free of Flask so scripts/build_explanations.py can run
+# in GitHub Actions without the web dependencies.
+SEQ_LEN, DROP_COLS, LSTM_SECTORS = explain.SEQ_LEN, explain.DROP_COLS, explain.LSTM_SECTORS
 LABELS = {0: "Sell", 1: "Hold", 2: "Buy"}
 
 
