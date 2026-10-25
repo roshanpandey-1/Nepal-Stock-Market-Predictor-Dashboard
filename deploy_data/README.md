@@ -8,7 +8,8 @@ this repo.
   not the full price history.
 - `models/`: the deployed `*_oos` sector models with their scalers and split dates, `retrain_report.csv` (the
   holdout results behind the reliability tags), the 30-day price ranges (`forecast_summary.csv`,
-  `forecast_daily.csv`), the one-stock backtest summary, and the test results shown on the site
+  `forecast_daily.csv`), the one-stock backtest summary, the "Why this signal?" explanations
+  (`explanations.json`, built by `scripts/build_explanations.py`), and the test results shown on the site
   (`signal_evidence.json`, `forecast_evidence.json`).
 
 GitHub Actions keep this folder current. To rebuild it by hand from your full local `data/`:

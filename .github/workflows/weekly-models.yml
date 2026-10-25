@@ -110,7 +110,9 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install dependencies
-        run: pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 loguru
+        run: |
+          pip install torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install numpy==1.26.2 pandas==2.1.3 scikit-learn==1.3.2 xgboost==2.0.2 loguru
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -118,6 +120,9 @@ jobs:
         run: |
           [ -d artifacts/forecasts ] && cp artifacts/forecasts/*.csv deploy_data/models/ || echo "No new forecasts."
           python scripts/retrain_with_gate.py publish --artifacts artifacts --target deploy_data/models
+      # "Why this signal?" explanations for the models just published (the site only reads this file)
+      - name: Rebuild signal explanations
+        run: python scripts/build_explanations.py --data-dir deploy_data
       - name: Commit and push if anything changed
         run: |
           if git diff --quiet -- deploy_data/models; then

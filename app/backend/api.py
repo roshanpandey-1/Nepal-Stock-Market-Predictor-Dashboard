@@ -11,7 +11,6 @@ holdout test, and a Buy/Sell/Hold here is not a confident trading recommendation
 """
 import csv
 import pickle
-from collections import OrderedDict
 from pathlib import Path
 
 from flask import Blueprint, jsonify
@@ -225,92 +224,27 @@ def signal(ticker):
         return jsonify({"ticker": ticker, "sector": sector, "signal": None, "error": str(e)}), 500
 
 
-_EXPLAIN_CACHE = OrderedDict()   # (ticker, last date, model file time) -> response; small, newest kept
-_EXPLAIN_CACHE_MAX = 128
-BACKGROUND_DAYS = 60             # earlier days the LSTM explanation compares today against
-
-
 @api.route("/explain/<ticker>")
 def explain_signal(ticker):
-    """Which inputs pushed the sector model toward Buy or Sell for this stock today.
+    """Which inputs pushed the sector model toward Buy or Sell for this stock.
 
-    Computed live from the same saved model /signal uses (see explain.py): XGBoost's
-    own TreeSHAP for the XGBoost sector, expected gradients (the GradientExplainer
-    method) for the LSTM sectors. It explains what the model reacted to, not whether
-    the signal is right -- the reliability verdict says that. Cached per stock and
-    latest trading day, so repeat views cost nothing.
+    Read from models/explanations.json, which scripts/build_explanations.py builds
+    after every price refresh and retrain (see explain.py). Nothing heavy runs here:
+    computing the LSTM attributions per request could exhaust the free host's memory.
+    It explains what the model reacted to, not whether the signal is right -- the
+    reliability verdict says that.
     """
     ticker = ticker.upper()
-    rows = _read_feature_rows(ticker)
-    if not rows:
-        return jsonify({"ticker": ticker, "error": "ticker not found"}), 404
-
-    sector = rows[0].get("Sector")
-    sector_name = sector.replace(" ", "_").replace("/", "_") if sector else None
-    feature_cols = [c for c in rows[0].keys() if c not in DROP_COLS]
-    is_lstm = sector in LSTM_SECTORS
-    model_path = MODELS_DIR / (f"{sector_name}_lstm_model_oos.pth" if is_lstm else f"{sector_name}_xgb_model_oos.pkl")
-    scaler_path = MODELS_DIR / f"{sector_name}_scaler_oos.pkl"
-    if not sector or not model_path.exists() or (is_lstm and not scaler_path.exists()):
-        return jsonify({"ticker": ticker, "sector": sector, "error": "model not found for this sector"}), 404
-
-    key = (ticker, rows[-1].get("Date"), model_path.stat().st_mtime)
-    if key in _EXPLAIN_CACHE:
-        _EXPLAIN_CACHE.move_to_end(key)
-        return jsonify(_EXPLAIN_CACHE[key])
-
-    def clean_row(r):
-        try:
-            return [float(r[c]) for c in feature_cols]
-        except (ValueError, TypeError):
-            return None
-
-    try:
-        if is_lstm:
-            import numpy as np
-            import torch
-            usable = [(r, c) for r in rows[-(SEQ_LEN + BACKGROUND_DAYS + 5):] if (c := clean_row(r)) is not None]
-            if len(usable) < SEQ_LEN + 10:
-                return jsonify({"ticker": ticker, "sector": sector,
-                                "error": "not enough recent clean data to explain this signal"}), 200
-            with open(scaler_path, "rb") as f:
-                scaler = pickle.load(f)
-            scaled = scaler.transform([c for _, c in usable])
-            windows = np.stack([scaled[i - SEQ_LEN:i] for i in range(SEQ_LEN, len(scaled) + 1)])
-            model = explain.build_lstm(len(feature_cols))
-            model.load_state_dict(torch.load(model_path, map_location="cpu"))
-            model.eval()
-            attr, baseline, score = explain.lstm_attributions(model, windows[-1], windows[:-1][-BACKGROUND_DAYS:])
-            with torch.no_grad():
-                probs = torch.softmax(model(torch.FloatTensor(windows[-1]).unsqueeze(0)), dim=1).squeeze(0).tolist()
-            values, as_of, method = usable[-1][1], usable[-1][0]["Date"], "expected_gradients"
-            compared = f"this stock's own previous {len(windows) - 1} trading days"
-        else:
-            latest = next(((r, c) for r in reversed(rows) if (c := clean_row(r)) is not None), None)
-            if latest is None:
-                return jsonify({"ticker": ticker, "sector": sector,
-                                "error": "no clean recent row to explain"}), 200
-            with open(model_path, "rb") as f:
-                model = pickle.load(f)
-            attr, baseline, score = explain.xgb_attributions(model, latest[1])
-            probs = [float(p) for p in model.predict_proba([latest[1]])[0]]
-            values, as_of, method = latest[1], latest[0]["Date"], "tree_shap"
-            compared = "the average day in the model's training data"
-
-        out = {
-            "ticker": ticker, "sector": sector, "as_of": as_of, "method": method,
-            "model_type": "LSTM" if is_lstm else "XGBoost",
-            "signal": LABELS[int(max(range(3), key=lambda i: probs[i]))],
-            "score": round(score, 3), "baseline": round(baseline, 3), "compared_with": compared,
-            "drivers": explain.top_drivers(attr, feature_cols, values, k=8),
-            "reliability": model_evidence.assess(model_evidence.for_sector(sector)),
-        }
-    except Exception as e:
-        return jsonify({"ticker": ticker, "sector": sector, "error": str(e)}), 500
-
-    _EXPLAIN_CACHE[key] = out
-    while len(_EXPLAIN_CACHE) > _EXPLAIN_CACHE_MAX:
-        _EXPLAIN_CACHE.popitem(last=False)
+    data = explain.load_explanations(MODELS_DIR)
+    if not data:
+        return jsonify({"ticker": ticker, "error": "Explanations have not been built yet."}), 200
+    item = data.get("stocks", {}).get(ticker)
+    if item is None:
+        return jsonify({"ticker": ticker, "error": "No explanation for this stock."}), 404
+    if "error" in item:
+        return jsonify({"ticker": ticker, "error": item["error"]}), 200
+    out = dict(item, ticker=ticker, generated=data.get("generated"))
+    out["reliability"] = model_evidence.assess(model_evidence.for_sector(item.get("sector")))
     return jsonify(out)
 
 

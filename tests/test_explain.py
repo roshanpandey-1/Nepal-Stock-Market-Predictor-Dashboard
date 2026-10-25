@@ -51,10 +51,23 @@ def test_top_drivers_orders_by_size_and_names_direction():
     assert out[0]["share_pct"] == pytest.approx(62.5)
 
 
-# ---------------- through the real saved models ----------------
+# ---------------- built offline from the real saved models ----------------
+@pytest.mark.parametrize("ticker,model_type", [("CHCL", "LSTM"), ("HDL", "XGBoost")])
+def test_explain_ticker_with_the_deployed_models(ticker, model_type):
+    pytest.importorskip("torch")
+    import csv
+    from app.backend.api import DROP_COLS, LSTM_SECTORS, SEQ_LEN
+    data = REPO / "deploy_data"
+    with open(data / "processed" / f"{ticker}_features.csv", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    d = explain.explain_ticker(rows, data / "models", DROP_COLS, LSTM_SECTORS, SEQ_LEN)
+    assert d["model_type"] == model_type and d["signal"] in ("Buy", "Sell", "Hold")
+    assert len(d["drivers"]) == 8 and sum(x["share_pct"] for x in d["drivers"]) <= 100.01
+    assert d["as_of"] == rows[-1]["Date"]
+
+
 @pytest.fixture
 def client(monkeypatch, tmp_path):
-    pytest.importorskip("torch")
     monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "t.db"))
     monkeypatch.setenv("SECRET_KEY", "test-secret")
     from app import create_app
@@ -62,21 +75,40 @@ def client(monkeypatch, tmp_path):
     data = REPO / "deploy_data"
     monkeypatch.setattr(api, "MODELS_DIR", data / "models")
     monkeypatch.setattr(api, "PROCESSED_DIR", data / "processed")
-    api._EXPLAIN_CACHE.clear()
+    # the web request must only read the prebuilt file, never run the models
+    def boom(*a, **k):
+        raise AssertionError("explanations must not be computed during a web request")
+    monkeypatch.setattr(explain, "lstm_attributions", boom)
+    monkeypatch.setattr(explain, "xgb_attributions", boom)
     app = create_app()
     app.config["TESTING"] = True
     return app.test_client()
 
 
 @pytest.mark.parametrize("ticker,model_type", [("CHCL", "LSTM"), ("HDL", "XGBoost")])
-def test_explain_endpoint_for_both_model_types(client, ticker, model_type):
+def test_explain_endpoint_reads_the_prebuilt_file(client, ticker, model_type):
     d = client.get(f"/api/explain/{ticker}").get_json()
     assert d["model_type"] == model_type and d["signal"] in ("Buy", "Sell", "Hold")
-    assert len(d["drivers"]) == 8 and sum(x["share_pct"] for x in d["drivers"]) <= 100.01
-    assert all(x["toward"] in ("Buy", "Sell") for x in d["drivers"])
+    assert len(d["drivers"]) == 8 and all(x["toward"] in ("Buy", "Sell") for x in d["drivers"])
     assert d["reliability"]["level"] in ("no_edge", "unproven", "tested", "unknown")
-    assert client.get(f"/api/explain/{ticker}").get_json() == d     # repeat view (cached) is identical
+    assert d["generated"]
+
+
+def test_shipped_explanations_cover_every_stock():
+    import json
+    data = REPO / "deploy_data"
+    shipped = json.loads((data / "models" / "explanations.json").read_text(encoding="utf-8"))
+    tickers = [t for t in (data / "processed" / "ticker_list.txt").read_text().split() if t]
+    assert set(tickers) <= set(shipped["stocks"])
 
 
 def test_explain_unknown_ticker_is_404(client):
     assert client.get("/api/explain/NOPE").status_code == 404
+
+
+def test_explain_without_the_file_says_so(client, monkeypatch, tmp_path):
+    from app.backend import api
+    monkeypatch.setattr(api, "MODELS_DIR", tmp_path)
+    explain._FILE_CACHE.update(key=None, data={})
+    d = client.get("/api/explain/CHCL").get_json()
+    assert "not been built" in d["error"]

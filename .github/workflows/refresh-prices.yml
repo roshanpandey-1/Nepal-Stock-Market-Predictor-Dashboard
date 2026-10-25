@@ -34,7 +34,10 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install selenium==4.15.0 beautifulsoup4 lxml pandas==2.1.3 numpy==1.26.2 ta==0.11.0 loguru
+        run: |
+          pip install selenium==4.15.0 beautifulsoup4 lxml pandas==2.1.3 numpy==1.26.2 ta==0.11.0 loguru
+          pip install torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install scikit-learn==1.3.2 xgboost==2.0.2
 
       - name: Download full price history
         run: |
@@ -52,6 +55,10 @@ jobs:
       - name: Rebuild trimmed deploy_data/processed
         run: python scripts/build_deploy_snapshot.py --only processed
 
+      # "Why this signal?" explanations for the new day (the site only reads this file)
+      - name: Rebuild signal explanations
+        run: python scripts/build_explanations.py --data-dir deploy_data
+
       - name: Upload updated full history
         run: |
           python scripts/data_snapshot.py pack
@@ -59,13 +66,13 @@ jobs:
 
       - name: Commit and push if anything changed
         run: |
-          if git diff --quiet -- deploy_data/processed; then
+          if git diff --quiet -- deploy_data/processed deploy_data/models/explanations.json; then
             echo "No new prices -- nothing to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy_data/processed
+          git add deploy_data/processed deploy_data/models/explanations.json
           git commit -m "chore(data): refresh daily prices"
           git pull --rebase origin main
           git push origin HEAD:main

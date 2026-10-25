@@ -1572,7 +1572,8 @@ function _renderExplain(d) {
        Percentages are each input's share of the total movement across all inputs; the top ${d.drivers.length} are shown.</p>` +
     `<div class="ex-list">${rows}</div>` +
     `<p class="text-dim" style="font-size:0.75rem; margin-top:8px;">${_escapeHTML(d.model_type)} model for ${_escapeHTML(d.sector)},
-       data as of ${_escapeHTML(d.as_of)}. Computed with ${d.method === "tree_shap" ? "TreeSHAP" : "expected gradients (the SHAP gradient method)"}.
+       data as of ${_escapeHTML(d.as_of)}. Computed with ${d.method === "tree_shap" ? "TreeSHAP" : "expected gradients (the SHAP gradient method)"}
+       after market close${d.generated ? ` on ${_escapeHTML(d.generated)}` : ""}, from the same model as the signal.
        Several inputs measure nearly the same thing (for example the different moving averages), so their effects overlap.</p>`;
 }
 

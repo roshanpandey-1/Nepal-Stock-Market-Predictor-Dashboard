@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/python-3.11-3776ab?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-3.1-000000?style=flat-square&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.1-ee4c2c?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![Tests](https://img.shields.io/badge/tests-105%20passing-16a34a?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/tests-109%20passing-16a34a?style=flat-square)](tests/)
 
 ### 🔗 [**View the live dashboard →**](https://nepse-intelligence-albt.onrender.com)
 
@@ -28,7 +28,7 @@ The project's main point is honesty about what the models can and cannot do. Eve
 |---|---|
 | 🟢 **Sector signal models** | One Buy/Sell/Hold classifier per sector: a PyTorch LSTM for 11 sectors and XGBoost for Manufacturing & Processing |
 | 🏷 **Reliability tag on every signal** | Each signal shows how its model did on unseen data against always guessing "Hold": **No edge**, **Unproven** or **Some edge** |
-| 🔍 **Why this signal?** | A panel on each stock page showing which inputs pushed the model toward Buy or Sell today, computed live with SHAP-style attributions |
+| 🔍 **Why this signal?** | A panel on each stock page showing which inputs pushed the model toward Buy or Sell, using SHAP-style attributions (TreeSHAP for XGBoost, expected gradients for the LSTMs) precomputed after every price refresh so the web server stays light |
 | 📊 **Honest backtest page** | Out-of-sample tests on every stock: signal strength with confidence ranges and trading results after NEPSE fees and tax |
 | 📈 **30-day price range** | A Prophet range of likely prices, shown with its tested accuracy and clearly labelled as not a prediction |
 | 👤 **Accounts** | Email/password or Google sign-in, password reset by email, watchlist, portfolio with live value and a sector breakdown, stocks-to-research ideas |
@@ -148,18 +148,19 @@ All scripts run from the repo root.
 | `python scripts/retrain_with_gate.py plan` / `run` / `publish` | Weekly retrain with the quality gate |
 | `python scripts/run_backtests_oos.py` | One-stock-per-sector demonstration backtest |
 | `python scripts/build_forecasts.py` | Rebuild the Prophet price ranges |
+| `python scripts/build_explanations.py` | Rebuild the "Why this signal?" explanations for every stock |
 | `python scripts/evaluate_signals_oos.py` | Test the deployed signals on every stock |
 | `python scripts/walkforward_signals.py` | Walk-forward test over six past quarters |
 | `python scripts/validate_forecasts.py` | Test the price forecasts against "no change" |
 | `python scripts/build_deploy_snapshot.py` | Rebuild `deploy_data/` from `data/` |
-| `pytest` | Run the test suite (105 tests) |
+| `pytest` | Run the test suite (109 tests) |
 
 ## 🤖 Automation (GitHub Actions)
 
 | Workflow | Schedule | What it does |
 |---|---|---|
-| Refresh daily prices | Mon–Fri, after market close | Fetches new prices into the full-history release and refreshes `deploy_data/processed` |
-| Weekly forecasts and retraining | Saturday | Rebuilds the price ranges, retrains every sector and promotes a model only if it passes the quality gate |
+| Refresh daily prices | Mon–Fri, after market close | Fetches new prices into the full-history release, refreshes `deploy_data/processed` and rebuilds the signal explanations |
+| Weekly forecasts and retraining | Saturday | Rebuilds the price ranges, retrains every sector, promotes a model only if it passes the quality gate, and rebuilds the explanations |
 | Monthly backtest | 1st of each month | Re-runs the one-stock-per-sector backtest |
 | Class-weight experiment | Manual | Compares class-weighted training with the deployed models; deploys nothing |
 

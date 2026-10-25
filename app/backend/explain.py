@@ -11,6 +11,12 @@ host cannot afford -- see requirements-web.txt):
   ``shap.GradientExplainer``: average of (x - baseline) * gradient along a
   straight line from a randomly chosen baseline day to today's window.
 
+These are computed by scripts/build_explanations.py (run by GitHub Actions after
+the daily price refresh and the weekly retrain) and saved to
+models/explanations.json; the web server only reads that file. Computing them per
+request was too heavy for the free host: the LSTM attribution runs the model
+thousands of times and could exhaust its memory and take the site down.
+
 Both explain the same number: the model's Buy score minus its Sell score (the
 difference of the two output logits). Positive = pushed toward Buy, negative =
 pushed toward Sell. ``attributions + baseline`` adds up to today's score, which
@@ -19,6 +25,10 @@ the tests check.
 This describes what the model reacted to. It does NOT say the signal is right;
 the reliability verdict (model_evidence.py) and the backtest page say that.
 """
+import json
+import pickle
+from pathlib import Path
+
 import numpy as np
 
 BUY, SELL = 2, 0   # class indices used everywhere: 0 Sell, 1 Hold, 2 Buy
@@ -119,3 +129,83 @@ def top_drivers(attr, names, values, k=8):
             "toward": "Buy" if attr[i] > 0 else "Sell",
         })
     return out
+
+
+# --------------------------------------------------------------------------- batch build and lookup
+EXPLANATIONS_FILE = "explanations.json"
+BACKGROUND_DAYS = 60   # earlier days the LSTM explanation compares today against
+
+
+def explain_ticker(rows, models_dir, drop_cols, lstm_sectors, seq_len=10, labels=("Sell", "Hold", "Buy")):
+    """Explanation payload for one stock's feature rows (list of CSV dicts), or {"error": ...}.
+
+    Uses the same saved model and the same latest rows as /api/signal.
+    """
+    models_dir = Path(models_dir)
+    sector = rows[0].get("Sector") if rows else None
+    if not sector:
+        return {"error": "no sector for this stock"}
+    name = sector.replace(" ", "_").replace("/", "_")
+    feature_cols = [c for c in rows[0].keys() if c not in drop_cols]
+    is_lstm = sector in lstm_sectors
+    model_path = models_dir / (f"{name}_lstm_model_oos.pth" if is_lstm else f"{name}_xgb_model_oos.pkl")
+    scaler_path = models_dir / f"{name}_scaler_oos.pkl"
+    if not model_path.exists() or (is_lstm and not scaler_path.exists()):
+        return {"error": "model not found for this sector"}
+
+    def clean_row(r):
+        try:
+            return [float(r[c]) for c in feature_cols]
+        except (ValueError, TypeError):
+            return None
+
+    if is_lstm:
+        import torch
+        usable = [(r, c) for r in rows[-(seq_len + BACKGROUND_DAYS + 5):] if (c := clean_row(r)) is not None]
+        if len(usable) < seq_len + 10:
+            return {"error": "not enough recent clean data to explain this signal"}
+        with open(scaler_path, "rb") as f:
+            scaler = pickle.load(f)
+        scaled = scaler.transform([c for _, c in usable])
+        windows = np.stack([scaled[i - seq_len:i] for i in range(seq_len, len(scaled) + 1)])
+        model = build_lstm(len(feature_cols))
+        model.load_state_dict(torch.load(model_path, map_location="cpu"))
+        model.eval()
+        attr, baseline, score = lstm_attributions(model, windows[-1], windows[:-1][-BACKGROUND_DAYS:])
+        with torch.no_grad():
+            probs = torch.softmax(model(torch.FloatTensor(windows[-1]).unsqueeze(0)), dim=1).squeeze(0).tolist()
+        values, as_of, method = usable[-1][1], usable[-1][0]["Date"], "expected_gradients"
+        compared = f"this stock's own previous {len(windows) - 1} trading days"
+    else:
+        latest = next(((r, c) for r in reversed(rows) if (c := clean_row(r)) is not None), None)
+        if latest is None:
+            return {"error": "no clean recent row to explain"}
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+        attr, baseline, score = xgb_attributions(model, latest[1])
+        probs = [float(p) for p in model.predict_proba([latest[1]])[0]]
+        values, as_of, method = latest[1], latest[0]["Date"], "tree_shap"
+        compared = "the average day in the model's training data"
+
+    return {
+        "sector": sector, "as_of": as_of, "method": method,
+        "model_type": "LSTM" if is_lstm else "XGBoost",
+        "signal": labels[int(max(range(3), key=lambda i: probs[i]))],
+        "score": round(score, 3), "baseline": round(baseline, 3), "compared_with": compared,
+        "drivers": top_drivers(attr, feature_cols, values, k=8),
+    }
+
+
+_FILE_CACHE = {"key": None, "data": {}}
+
+
+def load_explanations(models_dir):
+    """The prebuilt explanations file ({} if missing), re-read when it changes."""
+    path = Path(models_dir) / EXPLANATIONS_FILE
+    try:
+        key = (str(path), path.stat().st_mtime)
+        if _FILE_CACHE["key"] != key:
+            _FILE_CACHE.update(key=key, data=json.loads(path.read_text(encoding="utf-8")))
+        return _FILE_CACHE["data"]
+    except (OSError, ValueError):
+        return {}
