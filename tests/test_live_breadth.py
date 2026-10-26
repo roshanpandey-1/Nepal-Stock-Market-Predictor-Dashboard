@@ -79,3 +79,18 @@ def test_api_route_and_private_field_not_leaked():
     assert [r["ticker"] for r in ok["rows"]] == ["CCC", "DDD"]
     assert "_breadth_quotes" not in live and "_quotes" not in live
     assert bad.status_code == 404
+
+
+def test_nepse_time_with_fractional_seconds_is_parsed():
+    """NEPSE's "asOf" gained microseconds; the library's parser failed on them every new day,
+    which stopped the intraday index chart (getDailyNepseIndexGraph) from loading."""
+    from datetime import datetime
+    assert lm._parse_nepse_time("2026-10-26T14:32:20.500719") == datetime(2026, 10, 26, 14, 32, 20, 500719)
+    assert lm._parse_nepse_time("2023-09-27T10:45:00") == datetime(2023, 9, 27, 10, 45)
+
+    class LibraryManager:  # stands in for nepse.DummyIDUtils._DummyIDManager
+        def convertToDateTime(self, date_time_str):
+            return datetime.strptime(date_time_str, "%Y-%m-%dT%H:%M:%S")
+
+    lm._patch_nepse_time_parsing(LibraryManager)
+    assert LibraryManager().convertToDateTime("2026-10-26T14:32:20.5").date().isoformat() == "2026-10-26"

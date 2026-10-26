@@ -59,6 +59,28 @@ _circuit = {"failures": 0, "open_until": 0.0}
 _last_error = {"kind": None, "detail": None}
 
 
+def _parse_nepse_time(value):
+    """Parse NEPSE's market-status "asOf" time, with or without fractional seconds.
+
+    NEPSE now sends e.g. "2026-10-26T14:32:20.500719". NepseUnofficialApi parses it
+    with "%Y-%m-%dT%H:%M:%S", which raises "ValueError: unconverted data remains"
+    on the first request of each new day. That broke every call that needs a POST
+    payload id -- getDailyNepseIndexGraph, so the dashboard's intraday chart
+    disappeared -- until the server restarted.
+    """
+    text = str(value).strip().replace("Z", "")
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return datetime.strptime(text.split(".")[0], "%Y-%m-%dT%H:%M:%S")
+
+
+def _patch_nepse_time_parsing(manager_cls):
+    """Make the library's dummy-id manager accept fractional seconds (see above)."""
+    if hasattr(manager_cls, "convertToDateTime"):
+        manager_cls.convertToDateTime = lambda self, date_time_str: _parse_nepse_time(date_time_str)
+
+
 def _get_client():
     """Create the NEPSE client lazily.
 
@@ -73,6 +95,11 @@ def _get_client():
         if _client is not None:
             return _client
         from nepse import Nepse  # imported lazily on purpose
+        try:
+            from nepse import DummyIDUtils
+            _patch_nepse_time_parsing(DummyIDUtils._DummyIDManager)
+        except Exception:  # pragma: no cover - other library versions
+            logger.debug("NEPSE dummy-id time parser not patched; continuing")
         client = Nepse()
         # NEPSE's certificate chain is frequently misconfigured. The library
         # exposes this switch for that reason; it is scoped to this client
