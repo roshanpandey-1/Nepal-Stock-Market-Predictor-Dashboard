@@ -94,3 +94,13 @@ def test_nepse_time_with_fractional_seconds_is_parsed():
 
     lm._patch_nepse_time_parsing(LibraryManager)
     assert LibraryManager().convertToDateTime("2026-10-26T14:32:20.5").date().isoformat() == "2026-10-26"
+
+
+def test_most_active_lists_top_ten_by_turnover_and_by_volume():
+    quotes = {f"S{i}": {"ticker": f"S{i}", "turnover": i * 1000.0, "volume": (20 - i) * 10.0} for i in range(1, 16)}
+    quotes["NOVAL"] = {"ticker": "NOVAL", "turnover": None, "volume": None}
+    by_turnover = lm._top_turnover(quotes)
+    by_volume = lm._top_by(quotes, "volume")
+    assert len(by_turnover) == len(by_volume) == 10
+    assert by_turnover[0]["ticker"] == "S15" and by_volume[0]["ticker"] == "S1"
+    assert all(q["ticker"] != "NOVAL" for q in by_turnover + by_volume)

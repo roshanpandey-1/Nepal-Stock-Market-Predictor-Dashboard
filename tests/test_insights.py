@@ -149,4 +149,4 @@ def test_portfolio_page_shows_the_forecast_test(client, monkeypatch):
         "direction_right_30d_pct": 43.2, "range_level_pct": 80, "range_coverage_30d_pct": 73.2})
     _signup(client)
     html = client.get("/portfolio").get_data(as_text=True)
-    assert "not a prediction" in html and "43.2%" in html and ">Price range</button>" in html
+    assert "not a prediction" in html and "43.2%" in html and ">Forecast</button>" in html

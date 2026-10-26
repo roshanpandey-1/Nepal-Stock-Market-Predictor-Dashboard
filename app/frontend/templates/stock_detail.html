@@ -2,6 +2,12 @@
 {% block title %}{{ ticker }} · NEPSE Intelligence{% endblock %}
 {% block content %}
 
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="{{ url_for('main.dashboard') }}">Dashboard</a><span class="sep">›</span>
+  {% if sector %}<span>{{ sector }}</span><span class="sep">›</span>{% endif %}
+  <span aria-current="page">{{ ticker }}</span>
+</nav>
+
 <div class="quote-header">
   <div class="quote-id">
     <h1>{{ ticker }} <span class="src-badge" id="q-source">last session</span></h1>
@@ -74,7 +80,7 @@
   </div>
   <div class="col-12 col-md-8">
     <div class="limitation-note" style="margin-bottom:0;">
-      This signal comes from the sector's out-of-sample model (see <a href="{{ url_for('main.backtest') }}">Backtest</a>).
+      This signal comes from the sector's out-of-sample model (see <a href="{{ url_for('main.backtest') }}">Signal results</a>).
       The tag next to it says how that model did on data it had never seen, compared with simply guessing "Hold"
       every day. Right now no sector's model clearly beats that baseline, so treat every signal as illustrative,
       not as trading advice.
@@ -107,7 +113,7 @@
 </div>
 
 <div class="card-panel" id="forecast-panel" style="display:none;">
-  <h3 style="border-bottom:none; margin-bottom:6px;">30-Day Price Range</h3>
+  <h3 style="border-bottom:none; margin-bottom:6px;">30-Day Price Forecast</h3>
   <div class="limitation-note" style="margin-bottom:12px;">
     {% if forecast_evidence %}{% set e = forecast_evidence %}
     <strong>{{ e.headline }}</strong> Tested on {{ e.stocks }} stocks from {{ e.start_dates }} past start dates

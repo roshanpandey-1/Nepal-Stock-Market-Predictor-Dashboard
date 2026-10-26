@@ -623,15 +623,22 @@ def _normalise_all_indices(payload):
     return out
 
 
-def _top_turnover(quotes_by_symbol, limit=5):
-    """Top scrips by live turnover, from the same getLiveMarket call already
-    made for breadth/quotes -- no extra NEPSE request.
+TOP_LIST_SIZE = 10
+
+
+def _top_by(quotes_by_symbol, field, limit=TOP_LIST_SIZE):
+    """Top scrips by live turnover or volume, from the same getLiveMarket call
+    already made for breadth/quotes -- no extra NEPSE request.
     """
     if not quotes_by_symbol:
         return []
-    rows = [q for q in quotes_by_symbol.values() if q.get("turnover")]
-    rows.sort(key=lambda q: q["turnover"], reverse=True)
+    rows = [q for q in quotes_by_symbol.values() if q.get(field)]
+    rows.sort(key=lambda q: q[field], reverse=True)
     return rows[:limit]
+
+
+def _top_turnover(quotes_by_symbol, limit=TOP_LIST_SIZE):
+    return _top_by(quotes_by_symbol, "turnover", limit)
 
 
 def _market_open(payload):
@@ -659,6 +666,7 @@ def fetch_live_snapshot():
         "subindices": [],
         "all_indices": [],
         "top_turnover": [],
+        "top_volume": [],
         "_quotes": {},
         "_breadth_quotes": {},
     }
@@ -726,6 +734,7 @@ def fetch_live_snapshot():
     snapshot["index_history"] = _normalise_index_history(history)
     snapshot["subindices"] = _normalise_subindices(subindices)
     snapshot["top_turnover"] = _top_turnover(snapshot["_quotes"])
+    snapshot["top_volume"] = _top_by(snapshot["_quotes"], "volume")
 
     for key, payload in (("gainers", gainers), ("losers", losers)):
         rows = payload if isinstance(payload, list) else []

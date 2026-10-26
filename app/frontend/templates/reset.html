@@ -2,6 +2,7 @@
 {% block title %}Choose a new password · NEPSE Intelligence{% endblock %}
 {% block content %}
 <div class="auth-card">
+  <span class="brand-mark" aria-hidden="true">N</span>
   <h1>Choose a new password</h1>
   {% include "_flash.html" %}
   <form method="post" action="{{ url_for('acct.reset_password', token=token) }}" novalidate>

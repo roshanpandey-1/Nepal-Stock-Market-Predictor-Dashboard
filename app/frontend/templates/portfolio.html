@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Portfolio · NEPSE Intelligence{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
-  <h1 class="page-title mb-0">My Portfolio</h1>
-  <button class="btn-primary-nepse sm" type="button" id="open-tx-modal">+ Add holding</button>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">My account</div>
+    <h1>My portfolio</h1>
+    <p class="page-sub">Add the scrips you own and how many shares you hold; they are valued at live NEPSE prices.</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn-primary-nepse sm" type="button" id="open-tx-modal">+ Add holding</button>
+  </div>
 </div>
-<p class="text-dim">Add the scrips you own and how many shares you hold; they are valued at live NEPSE prices.</p>
 
 <div class="row g-2 mb-3" id="pf-tiles">
   <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Value at LTP</div><div class="value" id="pf-value">—</div></div></div>
@@ -15,7 +20,7 @@
 
 <div class="pf-tabs" role="tablist" aria-label="Portfolio sections">
   <button type="button" role="tab" id="tab-holdings" aria-controls="pf-holdings" aria-selected="true" data-tab="holdings">Holdings</button>
-  <button type="button" role="tab" id="tab-forecast" aria-controls="pf-forecast" aria-selected="false" data-tab="forecast" tabindex="-1">Price range</button>
+  <button type="button" role="tab" id="tab-forecast" aria-controls="pf-forecast" aria-selected="false" data-tab="forecast" tabindex="-1">Forecast</button>
   <button type="button" role="tab" id="tab-ideas" aria-controls="pf-ideas" aria-selected="false" data-tab="ideas" tabindex="-1">Ideas</button>
 </div>
 
@@ -103,7 +108,7 @@
 
 <div class="limitation-note">
   Signals are shown for reference only. They come from sector out-of-sample models that mostly lean toward "Hold" on unseen data
-  (see <a href="{{ url_for('main.backtest') }}">Backtest</a>), and are not trading advice.
+  (see <a href="{{ url_for('main.backtest') }}">Signal results</a>), and are not trading advice.
 </div>
 
 <div class="modal fade" id="tx-modal" tabindex="-1" aria-labelledby="tx-modal-title" aria-hidden="true">

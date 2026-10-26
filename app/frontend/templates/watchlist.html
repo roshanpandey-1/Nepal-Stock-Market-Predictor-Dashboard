@@ -1,8 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Watchlist · NEPSE Intelligence{% endblock %}
 {% block content %}
-<h1 class="page-title">My Watchlist</h1>
-<p class="text-dim">Stocks you're keeping an eye on, with live prices and each sector model's latest signal.</p>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">My account</div>
+    <h1>My watchlist</h1>
+    <p class="page-sub">Stocks you're keeping an eye on, with live prices and each sector model's latest signal.</p>
+  </div>
+</div>
 
 <div class="card-panel" id="watchlist-panel">
   <form class="add-row" id="watch-add-form" autocomplete="off">
@@ -20,7 +25,7 @@
 
 <div class="limitation-note">
   Signals come from the sector out-of-sample models. Most sectors lean heavily toward "Hold" on unseen data
-  (see <a href="{{ url_for('main.backtest') }}">Backtest</a>) — treat them as illustrative, not as trading advice.
+  (see <a href="{{ url_for('main.backtest') }}">Signal results</a>) — treat them as illustrative, not as trading advice.
 </div>
 {% endblock %}
 {% block scripts %}

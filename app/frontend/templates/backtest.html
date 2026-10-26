@@ -1,8 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Backtest · NEPSE Intelligence{% endblock %}
+{% block title %}Signal results · NEPSE Intelligence{% endblock %}
 {% block content %}
 
-<h1>How well do the signals really work?</h1>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Signal results</div>
+    <h1>How well do the signals really work?</h1>
+    <p class="page-sub">Every Buy/Sell/Hold model was tested on data it never saw, against simple benchmarks and with NEPSE trading costs included.</p>
+  </div>
+</div>
 
 {% if evidence %}
 <div class="limitation-note evidence-verdict">

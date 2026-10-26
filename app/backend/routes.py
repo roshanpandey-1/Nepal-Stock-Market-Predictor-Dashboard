@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from flask import Blueprint, render_template, abort, request
 
-from . import insights
+from . import explain, insights, model_evidence
 
 main = Blueprint("main", __name__)
 
@@ -179,15 +179,38 @@ def dashboard():
                 r[k] = 0.0
     tickers = _ticker_list()
     gainers, losers, _ = _get_cached_movers(limit=5)
+    sector_models, retrained = _sector_models()
+    sample = "NABIL" if "NABIL" in tickers else (sorted(tickers)[0] if tickers else None)
+    quote = _latest_quote(sample) if sample else None
     return render_template(
         "dashboard.html",
         backtest_rows=backtest_rows,
-        num_sectors=len(backtest_rows),
+        num_sectors=len(sector_models) or len(backtest_rows),
         num_tickers=len(tickers),
         tickers=sorted(tickers),
         top_gainers=gainers,
         top_losers=losers,
+        sector_models=sector_models,
+        prices_as_of=quote["date"] if quote else None,
+        models_retrained=retrained,
     )
+
+
+def _sector_models():
+    """Each sector model's reliability tag for the dashboard (from retrain_report.csv)."""
+    rows, retrained = [], None
+    for sector, ev in sorted(model_evidence.load_evidence().items()):
+        verdict = model_evidence.assess(ev)
+        rows.append({
+            "sector": sector,
+            "model": "LSTM" if sector in explain.LSTM_SECTORS else "XGBoost",
+            "level": verdict["level"], "label": verdict["label"], "caveat": verdict["caveat"],
+            "accuracy": round(ev["accuracy"] * 100, 1), "baseline": round(ev["baseline_accuracy"] * 100, 1),
+        })
+        retrained = max(retrained or "", ev.get("run_date") or "") or None
+    order = {"tested": 0, "unproven": 1, "no_edge": 2, "unknown": 3}
+    rows.sort(key=lambda r: (order.get(r["level"], 9), r["sector"]))
+    return rows, retrained
 
 
 def _latest_quote(ticker):

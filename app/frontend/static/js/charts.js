@@ -47,7 +47,7 @@ function _applyChartTheme() {
 }
 
 _applyChartTheme();
-Chart.defaults.font.family = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+Chart.defaults.font.family = "Inter, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 // --- Theme toggle (Light / Dark / System) ---------------------------------
 // Baked-in Chart.js dataset colors (borderColor/backgroundColor strings)
@@ -516,32 +516,69 @@ function _renderIndicesStrip(rows) {
   }).join("");
 }
 
-function _renderTopTurnover(rows) {
+// "Most active" card: top 10 by turnover or by volume, switched by the tabs in the card header.
+let _mostActive = { turnover: [], volume: [], view: "turnover" };
+
+function _renderTopTurnover(rows, volumeRows) {
   const panel = document.getElementById("turnover-panel");
   const body = document.getElementById("turnover-body");
   if (!panel || !body) return;
-  if (!rows || !rows.length) {
+  _mostActive.turnover = rows || [];
+  _mostActive.volume = volumeRows || [];
+  if (!_mostActive.turnover.length && !_mostActive.volume.length) {
     panel.style.display = "none";
     return;
   }
   panel.style.display = "";
-  body.innerHTML = `<table class="data-table">
-    <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th><th>Turnover</th></tr></thead>
-    <tbody>${rows.map(r => {
+  _wireMostActiveTabs();
+  _drawMostActive();
+}
+
+function _wireMostActiveTabs() {
+  const tabs = document.getElementById("active-tabs");
+  if (!tabs || tabs.dataset.wired) return;
+  tabs.dataset.wired = "1";
+  tabs.querySelectorAll("button").forEach(btn => btn.addEventListener("click", () => {
+    _mostActive.view = btn.dataset.view;
+    _drawMostActive();
+  }));
+}
+
+function _drawMostActive() {
+  const body = document.getElementById("turnover-body");
+  const tabs = document.getElementById("active-tabs");
+  if (!body) return;
+  const byVolume = _mostActive.view === "volume" && _mostActive.volume.length;
+  if (tabs) tabs.querySelectorAll("button").forEach(b => {
+    const on = b.dataset.view === (byVolume ? "volume" : "turnover");
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  const rows = byVolume ? _mostActive.volume : _mostActive.turnover;
+  if (!rows.length) {
+    body.innerHTML = `<p class="text-dim mb-0">No data yet.</p>`;
+    return;
+  }
+  body.innerHTML = `<div class="table-scroll"><table class="data-table">
+    <thead><tr><th>#</th><th>Symbol</th><th class="num">LTP</th><th class="num">Change</th><th class="num">${byVolume ? "Volume" : "Turnover"}</th></tr></thead>
+    <tbody>${rows.map((r, i) => {
       const up = (r.change_pct ?? 0) >= 0;
       const cls = up ? "pos" : "neg";
       const sign = up ? "+" : "";
-      const pct = r.change_pct == null ? "—" : `${sign}${r.change_pct}%`;
-      const cr = (r.turnover / 10000000).toFixed(2); // paisa-free Rs -> Cr, matches ShareHub's "Cr" unit
-      const title = r.name ? ` title="${r.name.replace(/"/g, "&quot;")}"` : "";
+      const pct = r.change_pct == null ? "—" : `${sign}${Number(r.change_pct).toFixed(2)}%`;
+      const metric = byVolume
+        ? (r.volume == null ? "—" : Math.round(r.volume).toLocaleString("en-IN"))
+        : (r.turnover == null ? "—" : `Rs ${(r.turnover / 10000000).toFixed(2)} Cr`);
+      const title = r.name ? ` title="${_escapeHTML(r.name)}"` : "";
       return `<tr>
-        <td${title}><a href="/stock/${encodeURIComponent(r.ticker)}">${r.ticker}</a></td>
-        <td>${r.ltp}</td>
-        <td class="${cls}">${pct}</td>
-        <td>Rs ${cr} Cr</td>
+        <td class="text-dim">${i + 1}</td>
+        <td${title}><a href="/stock/${encodeURIComponent(r.ticker)}">${_escapeHTML(r.ticker)}</a></td>
+        <td class="num">${r.ltp ?? "—"}</td>
+        <td class="num ${cls}">${pct}</td>
+        <td class="num">${metric}</td>
       </tr>`;
     }).join("")}</tbody>
-  </table>`;
+  </table></div>`;
 }
 
 function renderLiveMarket(data) {
@@ -603,7 +640,7 @@ function renderLiveMarket(data) {
   renderLiveIndexChart(data.index_history, data.index);
   renderSubIndices(data.subindices);
   _renderIndicesStrip(data.all_indices);
-  _renderTopTurnover(data.top_turnover);
+  _renderTopTurnover(data.top_turnover, data.top_volume);
   _layoutIndicesRow();
   _renderNavIndex(data);
 }
@@ -691,12 +728,13 @@ function _moverRowHTML(m, positive) {
   const pct = m.change_pct;
   const cls = (pct ?? 0) >= 0 ? "pos" : "neg";
   const sign = (pct ?? 0) >= 0 ? "+" : "";
-  const shown = pct == null ? "—" : `${sign}${pct}%`;
+  const shown = pct == null ? "—" : `${sign}${Number(pct).toFixed(2)}%`;
   const title = m.name ? ` title="${m.name.replace(/"/g, "&quot;")}"` : "";
+  // .num right-aligns the numbers under their right-aligned column headers
   return `<tr>
     <td${title}><a href="/stock/${encodeURIComponent(m.ticker)}">${m.ticker}</a></td>
-    <td>${m.ltp}</td>
-    <td class="${cls}">${shown}</td>
+    <td class="num">${m.ltp ?? "—"}</td>
+    <td class="num ${cls}">${shown}</td>
   </tr>`;
 }
 
@@ -716,7 +754,7 @@ function updateEodSectionsFromLive(data) {
   }
   if (srcEl && ((data.gainers || []).length || (data.losers || []).length)) {
     srcEl.textContent = label;
-    srcEl.className = "src-badge " + (data.stale ? "stale" : "live");
+    srcEl.className = "src-badge " + (data.stale ? "stale" : data.market_open === false ? "" : "live");
   }
 
   // Site-wide ticker strip, so it doesn't sit next to live tables showing
