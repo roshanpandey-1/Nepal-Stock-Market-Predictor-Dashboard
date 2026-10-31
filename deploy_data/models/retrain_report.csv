@@ -1,13 +1,13 @@
 run_date,sector,model_type,decision,reason,old_accuracy,new_accuracy,old_macro_f1,new_macro_f1,baseline_class,baseline_accuracy,baseline_macro_f1,old_buy_recall,new_buy_recall,old_sell_recall,new_sell_recall,old_nonhold_share,new_nonhold_share,holdout_rows,holdout_start
-2026-10-25,Hydro Power,lstm,promoted,candidate not worse than current on the shared holdout,0.5394,0.5272,0.3566,0.3766,Hold,0.5452,0.2352,0.0323,0.0938,0.2764,0.267,0.2136,0.2558,6385,2026-07-16
-2026-10-25,Microfinance,lstm,promoted,candidate not worse than current on the shared holdout,0.5751,0.5559,0.313,0.3354,Hold,0.593,0.2482,0.0523,0.1065,0.0748,0.095,0.0919,0.1548,3069,2026-07-16
-2026-10-25,Commercial Banks,lstm,kept_current,accuracy 0.6893 < current 0.7241 - 0.02,0.7241,0.6893,0.2853,0.3388,Hold,0.725,0.2802,0.0,0.0657,0.0079,0.0635,0.0042,0.0866,1178,2026-07-16
-2026-10-25,Development Banks,lstm,promoted,candidate not worse than current on the shared holdout,0.628,0.6159,0.4289,0.4282,Hold,0.628,0.2572,0.1017,0.096,0.3229,0.375,0.2167,0.248,992,2026-07-16
-2026-10-25,Finance,lstm,kept_current,accuracy 0.4788 < current 0.6191 - 0.02,0.6191,0.4788,0.269,0.3467,Hold,0.6276,0.2571,0.0163,0.2846,0.0054,0.1405,0.0242,0.3748,827,2026-07-16
-2026-10-25,Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.6993,0.6935,0.2744,0.318,Hold,0.6993,0.2744,0.0,0.0236,0.0,0.0522,0.0,0.0357,868,2026-07-16
-2026-10-25,Non Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.6055,0.6079,0.2828,0.2794,Hold,0.6067,0.2517,0.0,0.0385,0.0535,0.0053,0.0409,0.0186,806,2026-07-16
-2026-10-25,Hotels And Tourism,lstm,kept_current,macro-F1 0.2502 < current 0.3083 - 0.01,0.5746,0.6008,0.3083,0.2502,Hold,0.6008,0.2502,0.0,0.0,0.1478,0.0,0.1169,0.0,496,2026-07-16
-2026-10-25,Investment,lstm,promoted,candidate not worse than current on the shared holdout,0.6152,0.6198,0.3545,0.3697,Hold,0.6129,0.2533,0.0,0.0,0.2421,0.2947,0.1313,0.1498,434,2026-07-16
-2026-10-25,Others,lstm,promoted,candidate not worse than current on the shared holdout,0.5358,0.5269,0.3332,0.3302,Hold,0.5591,0.2391,0.0435,0.0543,0.1753,0.1623,0.2061,0.2061,558,2026-07-16
-2026-10-25,Tradings,lstm,promoted,candidate not worse than current on the shared holdout,0.75,0.75,0.2857,0.2857,Hold,0.75,0.2857,0.0,0.0,0.0,0.0,0.0,0.0,124,2026-07-16
-2026-10-25,Manufacturing And Processing,xgb,promoted,candidate not worse than current on the shared holdout,0.5173,0.5173,0.4086,0.4086,Hold,0.5569,0.2385,0.1163,0.1163,0.4677,0.4677,0.3886,0.3886,808,2026-07-16
+2026-10-31,Hydro Power,lstm,promoted,candidate not worse than current on the shared holdout,0.5273,0.518,0.3611,0.3635,Hold,0.5486,0.2362,0.0901,0.0999,0.2101,0.2234,0.2169,0.2471,5869,2026-07-30
+2026-10-31,Microfinance,lstm,promoted,candidate not worse than current on the shared holdout,0.5688,0.5859,0.3277,0.3209,Hold,0.5987,0.2497,0.0913,0.0595,0.0785,0.0769,0.1306,0.0893,2811,2026-07-30
+2026-10-31,Commercial Banks,lstm,kept_current,accuracy 0.6774 < current 0.7015 - 0.02,0.7015,0.6774,0.28,0.3831,Hold,0.7024,0.2751,0.0,0.1316,0.0076,0.1061,0.0046,0.1183,1082,2026-07-30
+2026-10-31,Development Banks,lstm,promoted,candidate not worse than current on the shared holdout,0.6312,0.6224,0.4305,0.4413,Hold,0.6356,0.2591,0.0897,0.1474,0.3523,0.3239,0.2108,0.2404,911,2026-07-30
+2026-10-31,Finance,lstm,kept_current,accuracy 0.5293 < current 0.6128 - 0.02,0.6128,0.5293,0.2682,0.3747,Hold,0.6219,0.2556,0.0172,0.3362,0.0057,0.1149,0.0261,0.3194,767,2026-07-30
+2026-10-31,Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.6989,0.6939,0.3197,0.3396,Hold,0.7051,0.2757,0.0254,0.0424,0.0513,0.0769,0.0351,0.054,797,2026-07-30
+2026-10-31,Non Life Insurance,lstm,promoted,candidate not worse than current on the shared holdout,0.6154,0.6086,0.2794,0.2742,Hold,0.6127,0.2533,0.0417,0.0,0.0,0.0359,0.0135,0.031,741,2026-07-30
+2026-10-31,Hotels And Tourism,lstm,kept_current,macro-F1 0.2867 < current 0.3044 - 0.01,0.5811,0.5811,0.3044,0.2867,Hold,0.6053,0.2514,0.0,0.0,0.1296,0.0833,0.1075,0.0702,456,2026-07-30
+2026-10-31,Investment,lstm,kept_current,macro-F1 0.3124 < current 0.3724 - 0.01,0.6291,0.6165,0.3724,0.3124,Hold,0.6216,0.2555,0.0,0.0,0.2989,0.1149,0.1579,0.0652,399,2026-07-30
+2026-10-31,Others,lstm,kept_current,macro-F1 0.3028 < current 0.3445 - 0.01,0.5361,0.5361,0.3445,0.3028,Hold,0.575,0.2434,0.1059,0.0588,0.1353,0.0752,0.2008,0.1306,513,2026-07-30
+2026-10-31,Tradings,lstm,kept_current,accuracy 0.5263 < current 0.7632 - 0.02,0.7632,0.5263,0.2886,0.2851,Hold,0.7632,0.2886,0.0,0.3636,0.0,0.0,0.0,0.3684,114,2026-07-30
+2026-10-31,Manufacturing And Processing,xgb,promoted,candidate not worse than current on the shared holdout,0.5054,0.5539,0.3919,0.4015,Hold,0.5849,0.246,0.1216,0.1216,0.425,0.3125,0.3774,0.283,742,2026-07-30
