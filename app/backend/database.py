@@ -103,13 +103,18 @@ def ensure_schema(engine):
     """Add columns that were introduced after a table was first created.
 
     db.create_all() creates missing tables but never alters existing ones, so a
-    deployed database would otherwise lack newer columns. Only ever adds nullable
-    columns, so it is safe to run on every start.
+    deployed database would otherwise lack newer columns. Only ever adds columns that are
+    nullable or have a default, so it is safe to run on every start.
     """
     from sqlalchemy import inspect, text
 
     insp = inspect(engine)
-    wanted = {"holdings": [("avg_cost", "FLOAT")]}
+    wanted = {
+        "holdings": [("avg_cost", "FLOAT")],
+        "alert_rules": [("seen", "TEXT DEFAULT '[]' NOT NULL"), ("last_checked", "VARCHAR(10)"),
+                        ("last_fired", "VARCHAR(10)"), ("last_message", "VARCHAR(300)"),
+                        ("category", "VARCHAR(30)")],
+    }
     with engine.begin() as conn:
         for table, cols in wanted.items():
             if not insp.has_table(table):

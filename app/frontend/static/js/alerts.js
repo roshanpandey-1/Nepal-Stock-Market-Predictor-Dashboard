@@ -9,7 +9,9 @@ async function initAlertsPage() {
   const valueInput = document.getElementById("alert-threshold");
   const catWrap = document.getElementById("alert-cat-wrap");
   const catSel = document.getElementById("alert-category");
+  // The options are in the page itself, so the form works even if the list below fails to load.
   let kinds = [];
+  try { kinds = JSON.parse(document.getElementById("alert-kinds").textContent); } catch (e) { kinds = []; }
 
   _wirePicker("alert-ticker", "alert-ticker-results", (row) => { form.ticker.value = row.t; kindSel.focus(); });
 
@@ -28,12 +30,6 @@ async function initAlertsPage() {
   async function load() {
     try {
       const d = await acctApi("/api/me/alerts");
-      if (!kinds.length) {
-        kinds = d.kinds;
-        kindSel.innerHTML = kinds.map((k) => `<option value="${_esc(k.kind)}">${_esc(k.label)}</option>`).join("");
-        catSel.innerHTML += d.categories.map((c) => `<option value="${_esc(c)}">${_esc(c.replace(/_/g, " "))}</option>`).join("");
-        syncKind();
-      }
       document.getElementById("alert-email").textContent = d.email;
       document.getElementById("alert-count").textContent = `${d.alerts.length} of ${d.max}`;
       if (!d.alerts.length) {
@@ -88,5 +84,6 @@ async function initAlertsPage() {
     } catch (err) { msg.textContent = err.message; msg.className = "form-msg error"; }
   });
 
+  syncKind();
   load();
 }

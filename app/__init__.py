@@ -52,7 +52,9 @@ def create_app(test_config=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=on_render,
-        PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+        # Signed-in sessions last one day from login (also enforced in accounts.current_user,
+        # because Flask would otherwise extend the cookie on every request).
+        PERMANENT_SESSION_LIFETIME=timedelta(days=1),
         GOOGLE_ENABLED=bool(os.environ.get("GOOGLE_CLIENT_ID") and os.environ.get("GOOGLE_CLIENT_SECRET")),
     )
     if test_config:

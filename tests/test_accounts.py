@@ -490,3 +490,49 @@ def test_new_alert_for_an_already_true_condition_does_not_fire_immediately(clien
     a = {x["kind"]: x for x in client.get("/api/me/alerts").get_json()["alerts"]}
     assert a["price_above"]["met_now"] is True and a["price_below"]["met_now"] is False
     assert a["price_above"]["last_checked"] is not None
+
+
+def test_schema_migration_repairs_an_early_alert_rules_table(tmp_path):
+    """A table created by an earlier development version had last_seen instead of seen."""
+    from sqlalchemy import create_engine, inspect, text
+    from app.backend.database import ensure_schema
+
+    eng = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE alert_rules (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, ticker VARCHAR(20) NOT NULL, "
+                       "kind VARCHAR(30) NOT NULL, threshold FLOAT, active BOOLEAN NOT NULL, state BOOLEAN NOT NULL, "
+                       "created_at DATETIME NOT NULL, last_seen VARCHAR(10))"))
+        c.execute(text("INSERT INTO alert_rules (user_id, ticker, kind, active, state, created_at) VALUES (1, 'NABIL', 'macd_cross_up', 1, 0, '2026-11-01')"))
+    ensure_schema(eng)
+    cols = {c["name"] for c in inspect(eng).get_columns("alert_rules")}
+    assert {"seen", "last_checked", "last_fired", "last_message", "category"} <= cols
+    with eng.begin() as c:
+        assert c.execute(text("SELECT seen FROM alert_rules")).fetchone() == ("[]",)
+
+
+def test_alerts_page_lists_the_alert_types_without_javascript(alerts_client):
+    _signup(alerts_client)
+    html = alerts_client.get("/alerts").get_data(as_text=True)
+    assert 'value="price_above"' in html and 'value="announcement"' in html and 'value="dividend"' in html
+
+
+def test_sign_in_lasts_one_day(client, monkeypatch):
+    from app.backend import accounts
+    _signup(client)
+    assert client.get("/api/me/watchlist").status_code == 200
+    with client.session_transaction() as s:
+        started = s["login_at"]
+    real = accounts.time.time
+    monkeypatch.setattr(accounts.time, "time", lambda: started + 23 * 3600)
+    assert client.get("/api/me/watchlist").status_code == 200              # still signed in after 23 hours
+    monkeypatch.setattr(accounts.time, "time", lambda: started + 24 * 3600 + 5)
+    assert client.get("/api/me/watchlist").status_code == 401              # signed out after a day
+    monkeypatch.setattr(accounts.time, "time", real)
+    assert client.get("/api/me/watchlist").status_code == 401              # and it stays signed out
+
+
+def test_session_without_login_time_is_signed_out(client):
+    _signup(client)
+    with client.session_transaction() as s:
+        s.pop("login_at")                                                   # e.g. a cookie from before this change
+    assert client.get("/api/me/watchlist").status_code == 401

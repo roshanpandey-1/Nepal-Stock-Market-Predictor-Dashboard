@@ -89,11 +89,22 @@ def csrf_token():
     return session["csrf"]
 
 
+SESSION_MAX_AGE = 24 * 60 * 60       # seconds a sign-in lasts, counted from login
+
+
+def _session_fresh():
+    started = session.get("login_at")
+    return isinstance(started, (int, float)) and 0 <= time.time() - started <= SESSION_MAX_AGE
+
+
 def current_user():
     if "user" in g:
         return g.user
     g.user = None
     uid = session.get("uid")
+    if uid and not _session_fresh():
+        session.clear()             # older than a day: sign in again
+        uid = None
     if uid:
         try:
             g.user = db.session.get(User, uid)
@@ -165,6 +176,7 @@ def _start_session(user):
     session.clear()
     session["uid"] = user.id
     session["csrf"] = secrets.token_hex(16)
+    session["login_at"] = int(time.time())
     session.permanent = True
     g.user = user
 
@@ -533,7 +545,8 @@ def api_watch_remove(ticker):
 @acct.route("/alerts")
 @login_required
 def alerts_page():
-    return render_template("alerts.html")
+    from ml.analysis import alerts as al
+    return render_template("alerts.html", kinds=al.kinds_for_ui(), categories=list(al.CATEGORIES))
 
 
 # --- JSON API: alerts ----------------------------------------------------------------

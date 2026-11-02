@@ -19,13 +19,16 @@
       </span>
     </label>
     <label class="field"><span>When</span>
-      <select name="kind" id="alert-kind" aria-label="Alert type"></select>
+      <select name="kind" id="alert-kind" aria-label="Alert type">
+        {% for k in kinds %}<option value="{{ k.kind }}">{{ k.label }}</option>{% endfor %}
+      </select>
     </label>
     <label class="field" id="alert-value-wrap"><span id="alert-value-label">Level</span>
       <input type="number" name="threshold" id="alert-threshold" step="any" inputmode="decimal">
     </label>
     <label class="field" id="alert-cat-wrap" hidden><span>Only for</span>
-      <select name="category" id="alert-category" aria-label="Announcement category"><option value="">Any announcement or headline</option></select>
+      <select name="category" id="alert-category" aria-label="Announcement category"><option value="">Any announcement or headline</option>
+        {% for c in categories %}<option value="{{ c }}">{{ c.replace('_', ' ') }}</option>{% endfor %}</select>
     </label>
     <button class="btn-primary-nepse sm" type="submit" id="alert-submit">Add alert</button>
   </form>
@@ -48,5 +51,6 @@
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+<script id="alert-kinds" type="application/json">{{ kinds|tojson }}</script>
 <script>initAlertsPage();</script>
 {% endblock %}
