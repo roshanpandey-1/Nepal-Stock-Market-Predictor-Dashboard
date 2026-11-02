@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}News &amp; announcements · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Market information</div>
+    <h1>News &amp; announcements</h1>
+    <p class="page-sub">Company announcements (results, dividends, book closures, general meetings, right shares) and market news headlines,
+      collected daily. Each item links to the original; categories and short notes come from fixed keyword rules.</p>
+  </div>
+</div>
+
+<div class="card-panel">
+  <form class="news-filter" method="get" action="{{ url_for('main.news_page') }}">
+    <label class="field"><span>Type</span>
+      <select name="kind" onchange="this.form.submit()">
+        <option value="" {% if not kind %}selected{% endif %}>All</option>
+        <option value="announcement" {% if kind == 'announcement' %}selected{% endif %}>Company announcements</option>
+        <option value="news" {% if kind == 'news' %}selected{% endif %}>News</option>
+      </select></label>
+    <label class="field"><span>Category</span>
+      <select name="category" onchange="this.form.submit()">
+        <option value="">All categories</option>
+        {% for key, label, n in categories %}<option value="{{ key }}" {% if key == category %}selected{% endif %}>{{ label }} ({{ n }})</option>{% endfor %}
+      </select></label>
+    <label class="field"><span>Company or word</span><input type="search" name="q" value="{{ q }}" placeholder="e.g. NABIL or dividend"></label>
+    <button type="submit" class="btn-primary-nepse sm">Filter</button>
+  </form>
+</div>
+
+<div class="card-panel">
+  {% if data['items'] %}
+  <p class="text-dim report-scope" style="margin:0 0 10px;">{{ data.count }} item{{ '' if data.count == 1 else 's' }}{% if data.count > data['items']|length %}, showing the newest {{ data['items']|length }}{% endif %}.
+    Last collected {{ (data.updated_at or '')[:16]|replace('T', ' ') }} UTC.</p>
+  <ul class="news-list">
+    {% for n in data['items'] %}
+    <li>
+      <span class="news-cat cat-{{ n.category }}">{{ n.category_label }}</span>
+      {% if n.ticker %}<a class="news-ticker" href="{{ url_for('main.stock_detail', ticker=n.ticker) }}">{{ n.ticker }}</a>{% endif %}
+      <a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+      <span class="cmp-sub">{{ n.date }} · {{ 'Announcement' if n.kind == 'announcement' else 'News' }} · {{ n.source }}</span>
+      {% if n.note %}<span class="news-note">{{ n.note }}</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-dim">{% if data.updated_at %}No items match these filters.{% else %}No announcements have been collected yet. They are gathered after each trading day.{% endif %}</p>
+  {% endif %}
+  <p class="limitation-note">Headlines and links from {{ data.source or 'ShareSansar' }}; open the link for the full text. Categories, company tags and notes
+    are added by keyword rules, so check the original before acting on anything. Nothing here is investment advice.</p>
+</div>
+{% endblock %}

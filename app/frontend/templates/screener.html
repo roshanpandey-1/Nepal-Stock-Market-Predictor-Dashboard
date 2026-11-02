@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Stock screener · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Research</div>
+    <h1>Stock screener</h1>
+    <p class="page-sub">Find stocks that match a technical pattern today, then narrow by sector, price, liquidity and RSI.
+      These are research filters built from end-of-day data, not buy or sell recommendations.</p>
+  </div>
+</div>
+
+<div class="card-panel">
+  <div class="scr-presets" id="scr-presets" role="group" aria-label="Screens">
+    <button type="button" class="scr-chip active" data-preset="">All stocks</button>
+    {% for p in presets %}<button type="button" class="scr-chip" data-preset="{{ p.key }}" title="{{ p.rule }}">{{ p.label }}</button>{% endfor %}
+  </div>
+  <form id="scr-form" class="scr-form" autocomplete="off">
+    <label class="field"><span>Sector</span>
+      <select name="sector"><option value="">All sectors</option>{% for s in sectors %}<option>{{ s }}</option>{% endfor %}</select></label>
+    <label class="field"><span>Price from (Rs)</span><input type="number" name="min_price" min="0" step="any" inputmode="decimal"></label>
+    <label class="field"><span>Price to (Rs)</span><input type="number" name="max_price" min="0" step="any" inputmode="decimal"></label>
+    <label class="field"><span>Avg daily turnover</span>
+      <select name="min_avg_turnover"><option value="">Any</option><option value="1000000">Rs 10 lakh or more</option>
+        <option value="10000000">Rs 1 crore or more</option><option value="50000000">Rs 5 crore or more</option></select></label>
+    <label class="field"><span>RSI from</span><input type="number" name="min_rsi" min="0" max="100" step="any"></label>
+    <label class="field"><span>RSI to</span><input type="number" name="max_rsi" min="0" max="100" step="any"></label>
+    <label class="field"><span>P/E at most</span><input type="number" name="max_pe" min="0" step="any" title="Latest close ÷ reported EPS (Merolagani); stocks with no or negative EPS are excluded"></label>
+    <label class="field"><span>P/B at most</span><input type="number" name="max_pbv" min="0" step="any" title="Latest close ÷ reported book value per share"></label>
+    <label class="field"><span>Trend</span>
+      <select name="trend"><option value="">Any</option><option value="up">Up</option><option value="sideways">Sideways</option><option value="down">Down</option></select></label>
+    <label class="scr-check"><input type="checkbox" name="include_not_traded" value="1"> <span>Include stocks that didn't trade in the latest session</span></label>
+  </form>
+  <p class="text-dim scr-rule" id="scr-rule"></p>
+</div>
+
+<div class="card-panel">
+  <div class="card-head">
+    <h3 id="scr-title">Results</h3>
+    <a class="btn-ghost-sm" id="scr-compare" href="#" style="display:none;">Compare selected</a>
+  </div>
+  <div class="table-scroll"><table class="data-table scr-table" id="scr-table"></table></div>
+  <p class="text-dim report-scope" id="scr-meta"></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/research.js') }}"></script>
+<script>initScreener();</script>
+{% endblock %}

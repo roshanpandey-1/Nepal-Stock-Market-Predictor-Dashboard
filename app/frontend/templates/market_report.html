@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Daily market report{% if report %} · {{ report.date }}{% endif %} · NEPSE Intelligence{% endblock %}
+{%- macro rs_big(x) -%}
+{%- if x is none -%}n/a
+{%- elif x >= 1e9 -%}Rs {{ '%.2f'|format(x / 1e9) }} arba
+{%- elif x >= 1e7 -%}Rs {{ '%.2f'|format(x / 1e7) }} crore
+{%- elif x >= 1e5 -%}Rs {{ '%.2f'|format(x / 1e5) }} lakh
+{%- else -%}Rs {{ '{:,.0f}'.format(x) }}{%- endif -%}
+{%- endmacro -%}
+{%- macro pct(x) -%}{% if x is none %}n/a{% else %}<span class="{{ 'pos' if x > 0 else 'neg' if x < 0 else '' }}">{{ '%+.2f'|format(x) }}%</span>{% endif %}{%- endmacro -%}
+{%- macro stock_link(t) -%}<a href="{{ url_for('main.stock_detail', ticker=t) }}">{{ t }}</a>{%- endmacro -%}
+{% block content %}
+
+{% if not report %}
+<div class="page-head"><div><div class="eyebrow">Daily market report</div><h1>No report yet</h1>
+<p class="page-sub">The report is written automatically after each trading day's price refresh. Check back after the next session.</p></div></div>
+{% else %}
+{% set b = report.breadth %}{% set t = report.totals %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Daily market report</div>
+    <h1>Session of {{ report.date }}</h1>
+    <p class="page-sub">What happened in the market, written by fixed rules from the day's closing data. {{ report.scope }}.</p>
+  </div>
+  {% if dates|length > 1 %}
+  <label class="report-date">Other days
+    <select onchange="if(this.value) location.href='{{ url_for('main.market_report') }}/' + this.value">
+      {% for d in dates %}<option value="{{ d }}" {% if d == report.date %}selected{% endif %}>{{ d }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="stat-tile">
+    <div class="label">NEPSE index</div>
+    {% if report.nepse_index %}
+      <div class="value">{{ '{:,.2f}'.format(report.nepse_index.value) }}</div>
+      <div class="hint">{{ pct(report.nepse_index.change_pct) }} · official close</div>
+    {% else %}
+      <div class="value text-dim" style="font-size:1.1rem;">Not captured</div>
+      <div class="hint">{{ report.nepse_index_note }}</div>
+    {% endif %}
+  </div></div>
+  <div class="col-6 col-lg-3"><div class="stat-tile">
+    <div class="label">Advancing / declining</div>
+    <div class="value"><span class="pos">{{ b.advancing }}</span> / <span class="neg">{{ b.declining }}</span></div>
+    <div class="hint">{{ b.unchanged }} unchanged · {{ b.traded }} of {{ b.tracked }} traded</div>
+  </div></div>
+  <div class="col-6 col-lg-3"><div class="stat-tile">
+    <div class="label">Turnover (tracked stocks)</div>
+    <div class="value" style="font-size:1.25rem;">{{ rs_big(t.turnover) }}</div>
+    <div class="hint">{% if t.turnover_vs_avg_pct is not none %}{{ pct(t.turnover_vs_avg_pct) }} vs 20-session average{% endif %}</div>
+  </div></div>
+  <div class="col-6 col-lg-3"><div class="stat-tile">
+    <div class="label">Shares traded</div>
+    <div class="value" style="font-size:1.25rem;">{{ '{:,.0f}'.format(t.volume) }}</div>
+    <div class="hint">Median stock {{ pct(b.median_change_pct) }}</div>
+  </div></div>
+</div>
+
+<div class="card-panel">
+  <h3>Summary</h3>
+  <ul class="report-headline">{% for line in report.headline %}<li>{{ line }}</li>{% endfor %}</ul>
+</div>
+
+<div class="card-panel">
+  <h3>Last {{ report.recent_sessions|length }} sessions</h3>
+  <div class="chart-box"><canvas id="report-breadth-chart"></canvas></div>
+  <p class="text-dim report-scope">Bars: stocks that rose and fell each session. Line: turnover of tracked stocks.</p>
+</div>
+
+<div class="row g-3">
+  {% for title, rows in [('Top gainers', report.gainers), ('Top losers', report.losers)] %}
+  <div class="col-12 col-lg-6"><div class="card-panel">
+    <h3>{{ title }}</h3>
+    <div class="table-scroll"><table class="data-table">
+      <thead><tr><th>Stock</th><th>Sector</th><th class="num">Close</th><th class="num">Change</th></tr></thead>
+      <tbody>{% for r in rows %}<tr><td>{{ stock_link(r.ticker) }}</td><td class="text-dim">{{ r.sector }}</td>
+        <td class="num">{{ '{:,.2f}'.format(r.close) }}</td><td class="num">{{ pct(r.change_pct) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6"><div class="card-panel">
+    <h3>Most active by turnover</h3>
+    <div class="table-scroll"><table class="data-table">
+      <thead><tr><th>Stock</th><th class="num">Turnover</th><th class="num">Change</th></tr></thead>
+      <tbody>{% for r in report.top_turnover %}<tr><td>{{ stock_link(r.ticker) }}</td><td class="num">{{ rs_big(r.turnover) }}</td><td class="num">{{ pct(r.change_pct) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></div>
+  <div class="col-12 col-lg-6"><div class="card-panel">
+    <h3>Unusual volume</h3>
+    {% if report.unusual_volume %}
+    <div class="table-scroll"><table class="data-table">
+      <thead><tr><th>Stock</th><th class="num">x usual volume</th><th class="num">Turnover</th><th class="num">Change</th></tr></thead>
+      <tbody>{% for r in report.unusual_volume %}<tr><td>{{ stock_link(r.ticker) }}</td><td class="num">{{ '%.1f'|format(r.relative_volume) }}x</td>
+        <td class="num">{{ rs_big(r.turnover) }}</td><td class="num">{{ pct(r.change_pct) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="text-dim report-scope">Volume at least 3 times the stock's 20-session average, with at least Rs 10 lakh traded.</p>
+    {% else %}<p class="text-dim">No stock traded at 3 times its usual volume.</p>{% endif %}
+  </div></div>
+</div>
+
+<div class="card-panel">
+  <h3>Sector performance</h3>
+  <div class="table-scroll"><table class="data-table">
+    <thead><tr><th>Sector</th><th class="num">Traded</th><th class="num">Up / down</th><th class="num">Median today</th>
+      <th class="num">Median 1W</th><th class="num">Median 1M</th><th class="num">Share of turnover</th></tr></thead>
+    <tbody>{% for s in report.sectors %}<tr>
+      <td>{{ s.sector }}</td><td class="num">{{ s.traded }}/{{ s.stocks }}</td>
+      <td class="num"><span class="pos">{{ s.advancing }}</span> / <span class="neg">{{ s.declining }}</span></td>
+      <td class="num">{{ pct(s.median_1d_pct) }}</td><td class="num">{{ pct(s.median_1w_pct) }}</td><td class="num">{{ pct(s.median_1m_pct) }}</td>
+      <td class="num">{{ '%.1f'|format(s.turnover_share_pct) if s.turnover_share_pct is not none else 'n/a' }}%</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="text-dim report-scope">Medians across each sector's tracked stocks (not NEPSE's official sub-indices). Sorted by the 1-month median.</p>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6"><div class="card-panel">
+    <h3>Observations</h3>
+    <ul class="report-list">{% for o in report.observations %}<li>{{ o }}</li>{% endfor %}</ul>
+  </div></div>
+  <div class="col-12 col-lg-6"><div class="card-panel">
+    <h3>Risks to keep in mind</h3>
+    <ul class="report-list risk">{% for o in report.risks %}<li>{{ o }}</li>{% endfor %}</ul>
+  </div></div>
+</div>
+
+{% if report.announcements and report.announcements.count %}
+<div class="card-panel">
+  <div class="card-head"><h3>Company announcements that day ({{ report.announcements.count }})</h3>
+    <a class="btn-ghost-sm" href="{{ url_for('main.news_page', kind='announcement') }}">All announcements →</a></div>
+  <ul class="news-list">
+    {% for n in report.announcements['items'] %}
+    <li><span class="news-cat cat-{{ n.category }}">{{ n.category_label }}</span>
+      {% if n.ticker %}<a class="news-ticker" href="{{ url_for('main.stock_detail', ticker=n.ticker) }}">{{ n.ticker }}</a>{% endif %}
+      <a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a></li>
+    {% endfor %}
+  </ul>
+  <p class="text-dim report-scope">Headlines and links from {{ report.announcements.source }}.</p>
+</div>
+{% endif %}
+
+<div class="limitation-note">{{ report.disclaimer }} Source: {{ report.source }}.</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if report %}
+<script>
+(function () {
+  const rows = {{ report.recent_sessions|tojson }};
+  const el = document.getElementById("report-breadth-chart");
+  if (!el || !window.Chart || !rows.length) return;
+  const css = getComputedStyle(document.documentElement);
+  const c = (n) => css.getPropertyValue(n).trim();
+  new Chart(el, {
+    data: {
+      labels: rows.map(r => r.date.slice(5)),
+      datasets: [
+        { type: "bar", label: "Rose", data: rows.map(r => r.advancing), backgroundColor: c("--green"), stack: "b", yAxisID: "y", order: 2 },
+        { type: "bar", label: "Fell", data: rows.map(r => -r.declining), backgroundColor: c("--red"), stack: "b", yAxisID: "y", order: 2 },
+        { type: "line", label: "Turnover (Rs arba)", data: rows.map(r => r.turnover / 1e9), borderColor: c("--accent"),
+          backgroundColor: c("--accent"), yAxisID: "y1", tension: 0.25, pointRadius: 2, order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { labels: { color: c("--text-dim") } },
+        tooltip: { callbacks: { label: (ctx) => ctx.dataset.yAxisID === "y1"
+          ? `Turnover: Rs ${ctx.parsed.y.toFixed(2)} arba` : `${ctx.dataset.label}: ${Math.abs(ctx.parsed.y)}` } } },
+      scales: {
+        x: { stacked: true, ticks: { color: c("--text-dim") }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: c("--text-dim"), callback: v => Math.abs(v) }, grid: { color: c("--border") },
+             title: { display: true, text: "Stocks", color: c("--text-dim") } },
+        y1: { position: "right", ticks: { color: c("--text-dim") }, grid: { display: false },
+              title: { display: true, text: "Rs arba", color: c("--text-dim") } },
+      },
+    },
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

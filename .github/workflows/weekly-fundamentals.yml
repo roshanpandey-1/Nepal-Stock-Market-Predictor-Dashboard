@@ -1,0 +1,49 @@
+name: Weekly company fundamentals
+
+# Sunday 02:20 UTC = 08:05 Nepal (market closed). Reads each tracked company's
+# public page on Merolagani once, a few seconds apart, and stores the reported
+# EPS, P/E, book value, P/B, dividends and market cap in
+# deploy_data/external/fundamentals.json (see ml/scraper/fundamentals.py).
+# A failed page keeps last week's values; the job fails only if most pages fail.
+on:
+  schedule:
+    - cron: "20 2 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-fundamentals
+  cancel-in-progress: false
+
+jobs:
+  fundamentals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install requests==2.31.0 beautifulsoup4==4.12.2 lxml==4.9.3
+
+      - name: Collect fundamentals
+        run: python scripts/fetch_fundamentals.py --data-dir deploy_data --pause 3
+
+      - name: Commit and push if anything changed
+        run: |
+          if git diff --quiet -- deploy_data/external/fundamentals.json && [ -z "$(git status --porcelain deploy_data/external)" ]; then
+            echo "No changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy_data/external/fundamentals.json
+          git commit -m "chore(data): weekly company fundamentals"
+          git pull --rebase origin main
+          git push origin HEAD:main

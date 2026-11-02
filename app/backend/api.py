@@ -216,6 +216,110 @@ def signal(ticker):
         return jsonify({"ticker": ticker, "sector": sector, "signal": None, "error": str(e)}), 500
 
 
+def _signal_evidence_headline():
+    """The site-wide honest summary of the signal tests (models/signal_evidence.json)."""
+    try:
+        import json
+        ev = json.loads((MODELS_DIR / "signal_evidence.json").read_text(encoding="utf-8"))
+        return {"headline": ev.get("headline"), "generated": ev.get("generated"), "costs": ev.get("costs")}
+    except (OSError, ValueError):
+        return None
+
+
+@api.route("/analysis/<ticker>")
+def stock_analysis(ticker):
+    """Technical analysis report for one stock, built by ml/analysis from the
+    processed daily data (no model inference and no language model here). The
+    Buy/Sell/Hold signal stays at /api/signal; the page combines the two and
+    labels which is which."""
+    from ml.analysis import market, report, stock
+
+    ticker = ticker.upper()
+    try:
+        market_date, rows = market.stock_table(DATA_DIR)
+        sectors = market.sector_performance(rows, market_date)
+        snap = stock.snapshot(ticker, path=DATA_DIR, sector_returns=market.sector_medians(sectors),
+                              market_date=market_date)
+    except Exception as exc:  # never 500 the stock page over the report
+        return jsonify({"ticker": ticker, "error": f"Analysis unavailable ({type(exc).__name__})"}), 200
+    if snap is None:
+        return jsonify({"ticker": ticker, "error": "No price history for this ticker."}), 404
+    rep = report.build(snap, rows)
+    rep["model"] = {
+        "type": None if not snap["sector"] else ("LSTM" if snap["sector"] in LSTM_SECTORS else "XGBoost"),
+        "data_up_to": snap["as_of"],
+        "evidence": _signal_evidence_headline(),
+    }
+    return jsonify({"snapshot": snap, "report": rep})
+
+
+@api.route("/compare")
+def compare_stocks():
+    """Side-by-side comparison: /api/compare?t=NABIL,NICA&period=6M (2-5 tickers)."""
+    from flask import request
+    from ml.analysis import compare
+
+    tickers = compare.parse_tickers(request.args.get("t", ""))
+    if len(tickers) < 2:
+        return jsonify({"error": "Give 2 to 5 tickers, e.g. ?t=NABIL,NICA"}), 400
+    try:
+        return jsonify(compare.compare(tickers, path=DATA_DIR, period=request.args.get("period", "6M")))
+    except Exception as exc:
+        return jsonify({"error": f"Comparison unavailable ({type(exc).__name__})"}), 200
+
+
+@api.route("/screener")
+def stock_screener():
+    """Research filters: /api/screener?preset=unusual_volume&sector=Hydro%20Power&min_avg_turnover=1000000"""
+    from flask import request
+    from ml.analysis import screener
+
+    a = request.args
+    if "presets" in a:
+        return jsonify({"presets": screener.presets()})
+    try:
+        result = screener.run(
+            path=DATA_DIR, preset=a.get("preset") or None, sector=a.get("sector") or None,
+            min_price=a.get("min_price"), max_price=a.get("max_price"),
+            min_avg_turnover=a.get("min_avg_turnover"), max_pe=a.get("max_pe"), max_pbv=a.get("max_pbv"), min_rsi=a.get("min_rsi"), max_rsi=a.get("max_rsi"),
+            min_ret_1m=a.get("min_ret_1m"), max_ret_1m=a.get("max_ret_1m"), trend=a.get("trend") or None,
+            include_not_traded=a.get("include_not_traded") == "1", sort=a.get("sort") or None,
+            descending=None if a.get("order") not in ("asc", "desc") else a.get("order") == "desc",
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": f"Screener unavailable ({type(exc).__name__})"}), 200
+    return jsonify(result)
+
+
+@api.route("/fundamentals/<ticker>")
+def fundamentals(ticker):
+    """Company figures as reported on Merolagani (collected weekly), with provenance."""
+    from ml.analysis import data as D, external
+    h = D.load_history(ticker.upper(), DATA_DIR)
+    price = float(h["Close"][-1]) if h is not None and len(h) else None
+    f = external.company_fundamentals(ticker.upper(), DATA_DIR, price=price)
+    if f is None:
+        return jsonify({"ticker": ticker.upper(), "error": "No reported fundamentals collected for this company yet."}), 404
+    return jsonify(dict(f, ticker=ticker.upper()))
+
+
+@api.route("/news")
+def news():
+    """Announcement and news headlines (ShareSansar): /api/news?ticker=NABIL&category=dividend&kind=announcement"""
+    from flask import request
+    from ml.analysis import external
+    a = request.args
+    try:
+        limit = max(1, min(int(a.get("limit", 50)), 300))
+    except ValueError:
+        limit = 50
+    return jsonify(external.announcements(DATA_DIR, ticker=a.get("ticker"), kind=a.get("kind"),
+                                          category=a.get("category"), since=a.get("since"),
+                                          query=a.get("q"), limit=limit))
+
+
 @api.route("/explain/<ticker>")
 def explain_signal(ticker):
     """Which inputs pushed the sector model toward Buy or Sell for this stock.

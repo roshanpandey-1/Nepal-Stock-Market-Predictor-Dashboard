@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import re
 import time
 from pathlib import Path
 from flask import Blueprint, render_template, abort, request
@@ -12,6 +13,7 @@ main = Blueprint("main", __name__)
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 MODELS_DIR = DATA_DIR / "models"
 PROCESSED_DIR = DATA_DIR / "processed"
+REPORTS_DIR = DATA_DIR / "reports" / "market"
 
 CLOSE_COL_INDEX = 4  # Date,Open,High,Low,Close,... -- fixed column order
 
@@ -167,6 +169,66 @@ def inject_ticker_strip():
     return {"ticker_strip": (gainers + losers)[:8]}
 
 
+def _load_market_report(date=None):
+    """A daily market report (written by scripts/build_daily_report.py), or None."""
+    name = "latest" if date is None else date
+    if not re.fullmatch(r"latest|\d{4}-\d{2}-\d{2}", name):
+        return None
+    try:
+        return json.loads((REPORTS_DIR / f"{name}.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _report_dates():
+    try:
+        return sorted((p.stem for p in REPORTS_DIR.glob("????-??-??.json")), reverse=True)
+    except OSError:
+        return []
+
+
+@main.route("/market-report")
+@main.route("/market-report/<date>")
+def market_report(date=None):
+    report = _load_market_report(date)
+    if report is None:
+        if date is not None:
+            abort(404, description=f"No market report for {date}")
+        return render_template("market_report.html", report=None, dates=[])
+    return render_template("market_report.html", report=report, dates=_report_dates()[:30])
+
+
+@main.route("/news")
+def news_page():
+    from ml.analysis import external
+    a = request.args
+    kind = a.get("kind") if a.get("kind") in ("announcement", "news") else None
+    data = external.announcements(DATA_DIR, kind=kind, category=a.get("category") or None,
+                                  query=(a.get("q") or "").strip() or None, limit=300)
+    return render_template("news.html", data=data, categories=external.categories(DATA_DIR),
+                           kind=kind, category=a.get("category") or "", q=a.get("q") or "")
+
+
+@main.route("/compare")
+def compare_page():
+    return render_template("compare.html")
+
+
+@main.route("/screener")
+def screener_page():
+    from ml.analysis import screener
+    return render_template("screener.html", presets=screener.presets(), sectors=_sector_list())
+
+
+def _sector_list():
+    try:
+        from ml.analysis import market
+        _, rows = market.stock_table(DATA_DIR)
+        return sorted({r["sector"] for r in rows if r["sector"]})
+    except Exception:
+        return []
+
+
 @main.route("/")
 def dashboard():
     backtest_rows = _read_csv(MODELS_DIR / "backtest_summary_oos.csv")
@@ -193,6 +255,7 @@ def dashboard():
         sector_models=sector_models,
         prices_as_of=quote["date"] if quote else None,
         models_retrained=retrained,
+        market_report=_load_market_report(),
     )
 
 
@@ -286,12 +349,16 @@ def stock_detail(ticker):
             has_history=False,
         )
 
+    quote = _latest_quote(ticker)
+    from ml.analysis import external
     return render_template(
         "stock_detail.html", ticker=ticker, sector=sector,
         company_name=_company_name(ticker),
-        quote=_latest_quote(ticker),
+        quote=quote,
         has_history=True,
         forecast_evidence=insights.load_forecast_evidence(),
+        fundamentals=external.company_fundamentals(ticker, DATA_DIR, price=quote["close"] if quote else None),
+        news=external.announcements(DATA_DIR, ticker=ticker, limit=8),
     )
 
 

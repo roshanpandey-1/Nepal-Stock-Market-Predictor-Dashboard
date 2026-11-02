@@ -20,6 +20,7 @@
     <div class="quote-actions">
       <button type="button" class="btn-watch" id="watch-btn" data-ticker="{{ ticker }}" aria-pressed="false">☆ Watch</button>
       <a class="btn-ghost-sm" href="{{ url_for('acct.portfolio', add=ticker) }}">+ Add to portfolio</a>
+      {% if sector %}<a class="btn-ghost-sm" href="{{ url_for('main.compare_page', t=ticker) }}">Compare</a>{% endif %}
     </div>
   </div>
   <div class="quote-price">
@@ -88,6 +89,60 @@
   </div>
 </div>
 
+<div class="card-panel" id="analysis-panel">
+  <h3>Stock analysis report</h3>
+  <div id="analysis-body"><span class="text-dim">Building the report&hellip;</span></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card-panel" id="fundamentals-panel">
+      <div class="card-head"><h3>Reported fundamentals</h3><span class="basis-chip basis-data" title="Figures as published by an external source">Reported</span></div>
+      {% if fundamentals %}{% set f = fundamentals %}
+      <div class="table-scroll"><table class="data-table an-table">
+        <tbody>
+          <tr><td>EPS{% if f.eps_period and f.eps_period.fiscal_year %} <span class="cmp-sub">FY {{ f.eps_period.fiscal_year }}{% if f.eps_period.quarter %}, Q{{ f.eps_period.quarter }}{% endif %}</span>{% endif %}</td>
+              <td class="num">{{ 'Rs %.2f'|format(f.eps) if f.eps is not none else 'n/a' }}</td></tr>
+          <tr><td>P/E <span class="cmp-sub">as listed by {{ f.source }}</span></td><td class="num">{{ '%.2f'|format(f.pe) if f.pe is not none else 'n/a' }}</td></tr>
+          {% if f.pe_at_close is not none %}<tr><td>P/E at our last close <span class="cmp-sub">close ÷ reported EPS</span></td><td class="num">{{ '%.2f'|format(f.pe_at_close) }}</td></tr>{% endif %}
+          <tr><td>Book value per share</td><td class="num">{{ 'Rs %.2f'|format(f.book_value) if f.book_value is not none else 'n/a' }}</td></tr>
+          <tr><td>Price to book <span class="cmp-sub">as listed</span></td><td class="num">{{ '%.2f'|format(f.pbv) if f.pbv is not none else 'n/a' }}</td></tr>
+          <tr><td>Cash dividend{% if f.cash_dividend_fy %} <span class="cmp-sub">FY {{ f.cash_dividend_fy }}</span>{% endif %}</td><td class="num">{{ '%.2f%%'|format(f.cash_dividend_pct) if f.cash_dividend_pct is not none else 'n/a' }}</td></tr>
+          <tr><td>Bonus shares{% if f.bonus_fy %} <span class="cmp-sub">FY {{ f.bonus_fy }}</span>{% endif %}</td><td class="num">{{ '%.2f%%'|format(f.bonus_pct) if f.bonus_pct is not none else 'n/a' }}</td></tr>
+          <tr><td>Market capitalisation</td><td class="num">{% if f.market_cap %}Rs {{ '%.2f'|format(f.market_cap / 1e9) }} arba{% else %}n/a{% endif %}</td></tr>
+        </tbody></table></div>
+      {% if f.dividend_history %}
+      <details class="mt-2"><summary class="text-dim" style="font-size:.82rem;">Cash dividend history ({{ f.dividend_history|length }} years)</summary>
+        <p class="an-note">{% for d in f.dividend_history %}FY {{ d.fiscal_year }}: {{ '%.2f'|format(d.value_pct) }}%{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      </details>{% endif %}
+      <p class="text-dim an-note">Source: <a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.source }}</a>, collected {{ (f.fetched_at or 'unknown date')[:10] }}.
+        {% if f.stale %}<strong>These figures may be out of date.</strong>{% endif %}
+        Dividend and bonus percentages are of the share's face value. {{ f.source_note }}</p>
+      {% else %}
+      <p class="text-dim">No reported fundamentals have been collected for {{ ticker }} yet. They are gathered weekly from public company pages; nothing is estimated.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card-panel" id="news-panel">
+      <div class="card-head"><h3>Announcements &amp; news</h3><a class="btn-ghost-sm" href="{{ url_for('main.news_page', q=ticker) }}">All →</a></div>
+      {% if news and news['items'] %}
+      <ul class="news-list">
+        {% for n in news['items'] %}
+        <li><span class="news-cat cat-{{ n.category }}">{{ n.category_label }}</span>
+          <a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>
+          <span class="cmp-sub">{{ n.date }} · {{ n.source }}</span>
+          {% if n.note %}<span class="news-note">{{ n.note }}</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-dim">No announcements or news matched to {{ ticker }} in the last 120 days.</p>
+      {% endif %}
+      <p class="text-dim an-note">Headlines link to {{ (news and news.source) or 'ShareSansar' }}; matched to this company by name, so some items may be missed.</p>
+    </div>
+  </div>
+</div>
+
 <div class="card-panel" id="explain-panel">
   <details id="explain-details" data-ticker="{{ ticker }}">
     <summary><h3 style="display:inline; border-bottom:none; margin:0;">Why this signal?</h3>
@@ -148,10 +203,11 @@
 {% endblock %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
 <script>
   initWatchButton();
   {% if has_history %}loadStockDetail("{{ ticker }}");{% endif %}
   initLiveQuote("{{ ticker }}");
-  {% if has_history %}initForecast("{{ ticker }}");initExplain();{% endif %}
+  {% if has_history %}initForecast("{{ ticker }}");initExplain();initAnalysis("{{ ticker }}");{% endif %}
 </script>
 {% endblock %}

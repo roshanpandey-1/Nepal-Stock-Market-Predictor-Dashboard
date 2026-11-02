@@ -75,6 +75,10 @@
     <nav class="side-nav">
       <div class="side-label">Market</div>
       <a class="side-link {% if ep == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}" {% if ep == 'main.dashboard' %}aria-current="page"{% endif %}>{{ icon('home') }}<span>Dashboard</span></a>
+      <a class="side-link {% if ep == 'main.market_report' %}active{% endif %}" href="{{ url_for('main.market_report') }}" {% if ep == 'main.market_report' %}aria-current="page"{% endif %}>{{ icon('doc') }}<span>Daily report</span></a>
+      <a class="side-link {% if ep == 'main.news_page' %}active{% endif %}" href="{{ url_for('main.news_page') }}" {% if ep == 'main.news_page' %}aria-current="page"{% endif %}>{{ icon('doc') }}<span>News &amp; announcements</span></a>
+      <a class="side-link {% if ep == 'main.screener_page' %}active{% endif %}" href="{{ url_for('main.screener_page') }}" {% if ep == 'main.screener_page' %}aria-current="page"{% endif %}>{{ icon('search') }}<span>Stock screener</span></a>
+      <a class="side-link {% if ep == 'main.compare_page' %}active{% endif %}" href="{{ url_for('main.compare_page') }}" {% if ep == 'main.compare_page' %}aria-current="page"{% endif %}>{{ icon('chart') }}<span>Compare stocks</span></a>
       <a class="side-link {% if ep == 'main.backtest' %}active{% endif %}" href="{{ url_for('main.backtest') }}" {% if ep == 'main.backtest' %}aria-current="page"{% endif %}>{{ icon('chart') }}<span>Signal results</span></a>
 
       <div class="side-label">My account</div>

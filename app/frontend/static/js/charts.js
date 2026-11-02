@@ -344,9 +344,12 @@ async function loadStockDetail(ticker) {
     const sigResp = await fetch(`/api/signal/${ticker}`);
     const sigData = await sigResp.json();
     setSignalBadge(sigData);
+    // The analysis report (analysis.js) shows the same signal in its model section.
+    document.dispatchEvent(new CustomEvent("signal:loaded", { detail: sigData }));
   } catch (e) {
     console.error("Failed to load signal", e);
     setSignalBadge(null);
+    document.dispatchEvent(new CustomEvent("signal:loaded", { detail: null }));
   }
 }
 

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Compare stocks · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Research</div>
+    <h1>Compare stocks</h1>
+    <p class="page-sub">Put 2 to 5 stocks side by side: returns, risk, trading activity, indicators and the sector models' signals.
+      Strengths and weaknesses are relative to the stocks you pick, never a verdict on which to buy.</p>
+  </div>
+</div>
+
+<div class="card-panel">
+  <form id="cmp-form" class="cmp-form" autocomplete="off">
+    <div class="cmp-chips" id="cmp-chips"></div>
+    <div class="cmp-add">
+      <input type="text" id="cmp-input" list="cmp-tickers" placeholder="Add a symbol, e.g. NABIL" maxlength="40" aria-label="Add a stock symbol">
+      <datalist id="cmp-tickers"></datalist>
+      <button type="submit" class="btn-primary-nepse sm">Add</button>
+    </div>
+    <div class="period-toggle" id="cmp-period">
+      <button type="button" data-p="1M">1M</button><button type="button" data-p="3M">3M</button>
+      <button type="button" data-p="6M" class="active">6M</button><button type="button" data-p="1Y">1Y</button>
+    </div>
+  </form>
+  <p class="text-dim cmp-hint" id="cmp-msg">Pick at least two stocks. Tip: try NABIL, NICA and GBIME.</p>
+</div>
+
+<div id="cmp-result" style="display:none;">
+  <div class="card-panel">
+    <h3>Price performance (rebased to 100)</h3>
+    <div class="chart-box"><canvas id="cmp-chart"></canvas></div>
+    <p class="text-dim report-scope" id="cmp-chart-note"></p>
+  </div>
+  <div class="card-panel">
+    <h3>Side by side</h3>
+    <div class="table-scroll"><table class="data-table cmp-table" id="cmp-table"></table></div>
+    <p class="text-dim report-scope">Green marks the best value in the group where "better" is clear (higher return, lower volatility, smaller fall, more turnover).
+      Data as of <span id="cmp-asof"></span>.</p>
+  </div>
+  <div class="card-panel">
+    <h3>Relative strengths and weaknesses</h3>
+    <div class="cmp-rel" id="cmp-rel"></div>
+    <p class="text-dim report-scope" id="cmp-note"></p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/research.js') }}"></script>
+<script>initCompare();</script>
+{% endblock %}
