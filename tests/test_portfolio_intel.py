@@ -121,3 +121,18 @@ def test_watchlist_view_order_missing_and_summary(root):
     s = v["summary"]
     assert s["count"] == 3 and s["biggest_gain"]["change_pct"] >= s["biggest_fall"]["change_pct"]
     assert "End-of-day" in v["basis"]
+
+
+def test_market_table_is_built_once_for_concurrent_first_requests(root, monkeypatch):
+    import threading
+    from ml.analysis import market
+    tmp, *_ = root
+    calls = []
+    real = D.universe
+    monkeypatch.setattr(D, "universe", lambda p=None: (calls.append(1), real(p))[1])
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    out = []
+    threads = [threading.Thread(target=lambda: out.append(market.stock_table(tmp))) for _ in range(5)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert len(calls) == 1 and len({id(o[1]) for o in out}) == 1

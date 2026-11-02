@@ -6,6 +6,7 @@ memory until the file on disk changes.
 import csv
 import json
 import os
+import re
 from pathlib import Path
 
 import numpy as np
@@ -91,12 +92,15 @@ def parse_rows(ticker, rows):
     return parse_table(ticker, header, [[r.get(h, "") for h in header] for r in rows])
 
 
+TICKER_RE = re.compile(r"[A-Z0-9]{1,15}")
 _CACHE = {}
 
 
 def load_history(ticker, path=None):
     """History for one ticker, or None if there is no file. Cached by mtime."""
-    ticker = ticker.upper()
+    ticker = (ticker or "").upper()
+    if not TICKER_RE.fullmatch(ticker):      # never build a file path from arbitrary text
+        return None
     f = processed_dir(path) / f"{ticker}_features.csv"
     try:
         mtime = f.stat().st_mtime

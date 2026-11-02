@@ -76,7 +76,27 @@ def create_app(test_config=None):
         return "ok", 200, {"Cache-Control": "no-store", "Content-Type": "text/plain"}
 
     _init_accounts(app)
+    if on_render or os.environ.get("WARM_CACHE") == "1":
+        _warm_market_table()
     return app
+
+
+def _warm_market_table():
+    """Read every stock file once in the background right after start-up, so the first
+    visitor to a stock page or the screener does not wait for it (several seconds on a
+    small instance). Failures are only logged; the pages build the table on demand anyway."""
+    import threading
+
+    def work():
+        try:
+            from app.backend.routes import DATA_DIR
+            from ml.analysis import market
+            market.stock_table(DATA_DIR)
+            logger.info("market table warmed")
+        except Exception:
+            logger.exception("could not warm the market table")
+
+    threading.Thread(target=work, name="warm-market-table", daemon=True).start()
 
 
 def _init_accounts(app):

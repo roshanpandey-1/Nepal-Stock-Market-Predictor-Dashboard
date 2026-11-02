@@ -204,7 +204,7 @@ def news_page():
     a = request.args
     kind = a.get("kind") if a.get("kind") in ("announcement", "news") else None
     data = external.announcements(DATA_DIR, kind=kind, category=a.get("category") or None,
-                                  query=(a.get("q") or "").strip() or None, limit=300)
+                                  query=(a.get("q") or "").strip()[:100] or None, limit=300)
     return render_template("news.html", data=data, categories=external.categories(DATA_DIR),
                            kind=kind, category=a.get("category") or "", q=a.get("q") or "")
 

@@ -112,4 +112,15 @@ git push origin main
 - **Signals are illustrative, not advice.** Every signal carries a reliability tag, and the Backtest page shows
   that the models do not make money after trading costs.
 - **The 30-day price range is not a prediction.** It did not beat "no change" in testing, and the page says so.
-- **Portfolio profit and loss is gross.** Brokerage, SEBON, DP charges and capital gains tax are not deducted.
+- **Portfolio profit and loss is gross.** Brokerage, SEBON, DP charges and capital gains tax are not deducted,
+  and it is only shown for holdings where the user entered a buy price.
+- **Market totals are for tracked stocks only.** The daily report and market views add up the ~270 stocks we track;
+  they are not the official NEPSE index or NEPSE's published totals. The official index close is captured on a
+  best-effort basis and the report says when it is missing.
+- **Fundamentals are as reported on Merolagani.** It is an unofficial source and quarterly figures are mostly
+  unaudited; every figure shows its source and collection date and is flagged when more than three weeks old.
+  If Merolagani or ShareSansar change their page layout, the collectors fail loudly rather than store bad data.
+- **Alerts use end-of-day data** and run once a day after the refresh, so they are not intraday price alerts.
+- **First load after a restart.** Building the market table reads all ~270 stock files (about 1 s on a laptop,
+  several seconds on the free tier). On Render the app starts this in the background at start-up, so visitors
+  rarely wait for it.

@@ -76,6 +76,7 @@ def company_fundamentals(ticker, path=None, price=None):
         return None
     out = {k: None for k in FIELDS}
     out.update(c)
+    out["url"] = safe_url(c.get("url"))
     out["dividend_history"] = _collapse_years(out.get("dividend_history"))
     out["bonus_history"] = _collapse_years(out.get("bonus_history"))
     out["source"] = store.get("source")
@@ -95,9 +96,16 @@ def fundamentals_map(path=None):
     return store.get("companies") or {}
 
 
+def safe_url(url):
+    """The link if it is a plain http(s) address, else None, so stored data can never put a
+    javascript: or other scheme into a page or an email."""
+    u = str(url or "").strip()
+    return u if u.lower().startswith(("https://", "http://")) else None
+
+
 def announcements(path=None, ticker=None, kind=None, category=None, since=None, limit=50, query=None):
     store = _load("announcements.json", path) or {}
-    items = store.get("items") or []
+    items = [i for i in (store.get("items") or []) if safe_url(i.get("url"))]
     if ticker:
         items = [i for i in items if i.get("ticker") == ticker.upper()]
     if kind:

@@ -159,13 +159,17 @@ All scripts run from the repo root.
 | `python scripts/walkforward_signals.py` | Walk-forward test over six past quarters |
 | `python scripts/validate_forecasts.py` | Test the price forecasts against "no change" |
 | `python scripts/build_deploy_snapshot.py` | Rebuild `deploy_data/` from `data/` |
-| `pytest` | Run the test suite (109 tests) |
+| `python scripts/build_daily_report.py --data-dir deploy_data` | Build the rule-based daily market report (used daily by GitHub Actions) |
+| `python scripts/fetch_announcements.py --data-dir deploy_data --days 30` | Collect ShareSansar announcement and news headlines |
+| `python scripts/fetch_fundamentals.py --data-dir deploy_data` | Collect reported fundamentals from Merolagani (about 20 minutes, polite pauses) |
+| `python scripts/run_alerts.py --data-dir deploy_data --dry-run` | Check the alert rules without sending email (needs `DATABASE_URL`) |
+| `pytest` | Run the test suite (223 tests) |
 
 ## 🤖 Automation (GitHub Actions)
 
 | Workflow | Schedule | What it does |
 |---|---|---|
-| Refresh daily prices | Mon–Fri, after market close | Fetches new prices into the full-history release, refreshes `deploy_data/processed` and rebuilds the signal explanations |
+| Refresh daily prices | Mon–Fri, after market close | Fetches new prices into the full-history release, refreshes `deploy_data/processed`, rebuilds the signal explanations, collects announcement headlines and builds the daily market report |
 | Send alert emails (a step of the daily workflow) | Mon–Fri, after the refresh | Emails people whose alerts fired; needs the `DATABASE_URL`, `BREVO_API_KEY` and `MAIL_SENDER` repository secrets, and does nothing without them |
 | Weekly fundamentals | Sunday | Collects reported EPS, P/E, book value and dividends from Merolagani |
 | Weekly forecasts and retraining | Saturday | Rebuilds the price ranges, retrains every sector, promotes a model only if it passes the quality gate, and rebuilds the explanations |
@@ -188,13 +192,16 @@ Every bot commit to `main` triggers a Render redeploy.
 │   │   ├── model_evidence.py   # Reliability tag for each sector model
 │   │   ├── explain.py          # "Why this signal?" attributions
 │   │   ├── insights.py         # Ideas to research, portfolio price ranges
-│   │   ├── portfolio_utils.py  # Holding valuation
-│   │   └── mailer.py           # Password-reset email (Brevo)
+│   │   ├── portfolio_utils.py  # Holding valuation and profit/loss
+│   │   ├── alert_runner.py     # Daily alert emails (run by GitHub Actions)
+│   │   └── mailer.py           # Email through Brevo (password reset, alerts)
 │   └── frontend/               # What the browser gets
 │       ├── templates/          # Jinja2 pages
 │       └── static/             # CSS, JavaScript, images
 ├── ml/                         # Machine learning code
-│   ├── scraper/                # Live NEPSE market data
+│   ├── analysis/               # Rule-based research: stock report, market report, screener, compare,
+│   │                           #   portfolio checks and alert rules (numpy only, no AI model)
+│   ├── scraper/                # Live NEPSE data, Merolagani fundamentals, ShareSansar headlines
 │   ├── features/               # Technical indicators and labels
 │   ├── models/                 # Sector trainer (LSTM/XGBoost) and Prophet forecaster
 │   └── backtesting/            # Strategy simulation and metrics
@@ -222,6 +229,11 @@ The dashboard runs on **Render** (`render.yaml`): it installs `requirements-web.
 - [x] Out-of-sample and walk-forward tests of the signals, after costs
 - [x] Price forecast validation (and fixing the Friday dip)
 - [x] Accounts with Google sign-in and password reset
+- [x] Rule-based stock analysis report, daily market report, screener and compare
+- [x] Reported fundamentals (Merolagani) and announcement headlines (ShareSansar)
+- [x] Portfolio profit/loss, portfolio and watchlist checks, daily alert emails
+- [ ] Check that the official NEPSE index can be captured from GitHub's servers (the report says when it is missing)
+- [ ] Educational pages on NEPSE fees, taxes and settlement (needs checked figures)
 - [ ] Re-test the five sector models replaced in the 24 Oct 2026 retrain
 - [ ] Find features that carry more signal than price-based indicators (for example fundamentals or corporate actions)
 

@@ -5,6 +5,7 @@ project tracks (about 270 listed equities), computed from completed daily
 sessions. They are NOT the official NEPSE index or NEPSE's published market
 totals, and are labelled that way wherever they are shown.
 """
+import threading
 import time
 
 import numpy as np
@@ -63,20 +64,28 @@ _TABLE = {"key": None, "rows": None, "date": None, "checked": 0.0, "path": None}
 RECHECK_SECONDS = 60   # data changes once a day; don't stat 270 files on every request
 
 
+_TABLE_LOCK = threading.Lock()
+
+
 def stock_table(path=None):
     """(market_date, [stock_row, ...]) for every tracked stock. Cached until any file changes
-    (files are re-checked at most once a minute)."""
+    (files are re-checked at most once a minute). A lock makes concurrent first requests wait
+    for one build instead of each reading all the files."""
     now = time.monotonic()
     if _TABLE["rows"] is not None and _TABLE["path"] == str(path) and now - _TABLE["checked"] < RECHECK_SECONDS:
         return _TABLE["date"], _TABLE["rows"]
-    _TABLE.update(checked=now, path=str(path))
-    hists = D.universe(path)
-    key = tuple((t, h.last_date, len(h)) for t, h in sorted(hists.items()))
-    if _TABLE["key"] != key:
-        names = D.company_names(path)
-        _TABLE.update(key=key, rows=[stock_row(h, names) for h in hists.values()],
-                      date=D.market_date(hists))
-    return _TABLE["date"], _TABLE["rows"]
+    with _TABLE_LOCK:
+        now = time.monotonic()
+        if _TABLE["rows"] is not None and _TABLE["path"] == str(path) and now - _TABLE["checked"] < RECHECK_SECONDS:
+            return _TABLE["date"], _TABLE["rows"]
+        hists = D.universe(path)
+        key = tuple((t, h.last_date, len(h)) for t, h in sorted(hists.items()))
+        if _TABLE["key"] != key or _TABLE["path"] != str(path):
+            names = D.company_names(path)
+            _TABLE.update(key=key, rows=[stock_row(h, names) for h in hists.values()],
+                          date=D.market_date(hists))
+        _TABLE.update(checked=time.monotonic(), path=str(path))
+        return _TABLE["date"], _TABLE["rows"]
 
 
 def _median(values):

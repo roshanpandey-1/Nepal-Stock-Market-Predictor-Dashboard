@@ -317,7 +317,7 @@ def news():
         limit = 50
     return jsonify(external.announcements(DATA_DIR, ticker=a.get("ticker"), kind=a.get("kind"),
                                           category=a.get("category"), since=a.get("since"),
-                                          query=a.get("q"), limit=limit))
+                                          query=(a.get("q") or "")[:100] or None, limit=limit))
 
 
 @api.route("/explain/<ticker>")

@@ -190,3 +190,8 @@ def test_analysis_endpoint(monkeypatch):
     assert d["report"]["model"]["type"] == "LSTM"
     assert d["report"]["model"]["data_up_to"] == d["snapshot"]["as_of"]
     assert c.get("/api/analysis/NOPE123").status_code == 404
+
+
+def test_load_history_rejects_non_ticker_text():
+    for bad in ("../secret", "..", "A/B", "nabil; rm", "", "X" * 40):
+        assert D.load_history(bad, DEPLOY) is None

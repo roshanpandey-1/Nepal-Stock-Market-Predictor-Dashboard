@@ -129,9 +129,9 @@ def _write_external(tmp_path, fetched_at=None):
                       "url": "https://merolagani.com/CompanyDetail.aspx?symbol=NABIL"},
             "LOSS": {"eps": -4.0, "book_value": 80.0, "fetched_at": fetched_at}}}))
     (ext / "announcements.json").write_text(json.dumps({"source": "ShareSansar", "updated_at": fetched_at, "items": [
-        {"title": "Nabil Bank Limited has posted a net profit", "url": "u1", "date": "2026-11-02", "kind": "announcement",
+        {"title": "Nabil Bank Limited has posted a net profit", "url": "https://www.sharesansar.com/u1", "date": "2026-11-02", "kind": "announcement",
          "ticker": "NABIL", "category": "quarterly_result", "category_label": "Quarterly result", "source": "ShareSansar"},
-        {"title": "Market news", "url": "u2", "date": "2026-11-01", "kind": "news", "ticker": None,
+        {"title": "Market news", "url": "https://www.sharesansar.com/u2", "date": "2026-11-01", "kind": "news", "ticker": None,
          "category": "other", "category_label": "Other", "source": "ShareSansar"}]}))
     return tmp_path
 
@@ -154,7 +154,7 @@ def test_old_fundamentals_flagged_stale(tmp_path):
 def test_announcement_filters(tmp_path):
     d = _write_external(tmp_path)
     assert external.announcements(d, ticker="nabil")["count"] == 1
-    assert external.announcements(d, kind="news")["items"][0]["url"] == "u2"
+    assert external.announcements(d, kind="news")["items"][0]["url"] == "https://www.sharesansar.com/u2"
     assert external.announcements(d, category="quarterly_result")["count"] == 1
     assert external.announcements(d, query="NABIL")["count"] == 1
     assert external.announcements(d, since="2026-11-02")["count"] == 1
@@ -197,3 +197,24 @@ def test_dividend_history_collapses_duplicate_years():
     out = external._collapse_years(h)
     assert out == [{"fiscal_year": "079-080", "value_pct": 11.0}, {"fiscal_year": "078-079", "value_pct": 0.0},
                    {"fiscal_year": "077-078", "value_pct": 4.4}]
+
+
+def test_unsafe_links_are_never_shown(tmp_path):
+    ext = tmp_path / "external"
+    ext.mkdir()
+    items = [{"url": "javascript:alert(1)", "title": "bad", "date": "2026-11-01", "ticker": "NABIL"},
+             {"url": " JAVASCRIPT:x", "title": "bad2", "date": "2026-11-01", "ticker": "NABIL"},
+             {"url": "https://www.sharesansar.com/a", "title": "good", "date": "2026-11-01", "ticker": "NABIL"}]
+    (ext / "announcements.json").write_text(json.dumps({"items": items}), encoding="utf-8")
+    out = external.announcements(tmp_path)["items"]
+    assert [i["title"] for i in out] == ["good"]
+    assert external.safe_url("data:text/html,x") is None and external.safe_url("https://x.y/z") == "https://x.y/z"
+
+
+def test_listing_parser_keeps_only_sharesansar_links():
+    html = """<div class="featured-news-list"><a href="javascript:alert(1)"><h4>Evil</h4></a></div>
+              <div class="featured-news-list"><a href="https://evil.example/x-2026-11-01"><h4>Elsewhere</h4></a></div>
+              <div class="featured-news-list"><a href="/announcementdetail/ok-2026-11-01"><h4>Relative ok</h4></a></div>"""
+    items, _ = A.parse_listing(html)
+    assert [i["title"] for i in items] == ["Relative ok"]
+    assert items[0]["url"] == "https://www.sharesansar.com/announcementdetail/ok-2026-11-01"

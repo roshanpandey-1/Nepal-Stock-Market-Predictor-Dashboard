@@ -10,8 +10,10 @@ import re
 import time
 from datetime import datetime
 from difflib import SequenceMatcher
+from urllib.parse import urljoin
 
 SOURCE_NAME = "ShareSansar"
+SITE = "https://www.sharesansar.com"
 ANNOUNCEMENTS_URL = "https://www.sharesansar.com/announcement"
 NEWS_URL = "https://www.sharesansar.com/category/latest"
 USER_AGENT = ("Mozilla/5.0 (compatible; NEPSE-Intelligence/1.0; educational research project; "
@@ -176,7 +178,10 @@ def parse_listing(html):
         if date is None:
             m = re.search(r"(\d{4}-\d{2}-\d{2})$", a["href"].rstrip("/"))
             date = m.group(1) if m else None
-        items.append({"title": " ".join(h.get_text(" ").split()), "url": a["href"], "date": date})
+        url = urljoin(SITE, a["href"].strip())
+        if not url.startswith(SITE + "/"):        # keep only ShareSansar's own pages
+            continue
+        items.append({"title": " ".join(h.get_text(" ").split()), "url": url, "date": date})
     nxt = soup.find("a", rel="next")
     return items, (nxt.get("href") if nxt else None)
 
