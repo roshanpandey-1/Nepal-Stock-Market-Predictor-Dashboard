@@ -6,6 +6,8 @@ sessions. They are NOT the official NEPSE index or NEPSE's published market
 totals, and are labelled that way wherever they are shown.
 """
 import json
+import logging
+import os
 import threading
 import time
 
@@ -91,13 +93,27 @@ def _table_path(path):
     return D.data_dir(path).joinpath(*TABLE_FILE)
 
 
-def _load_saved_table(path, signature):
+logger = logging.getLogger(__name__)
+
+
+def build_allowed():
+    """Whether this process may build the table from all the files. Off on Render: there it
+    takes long enough on the free CPU to miss health checks and get the server restarted,
+    so the site uses the saved table even if it is a session behind."""
+    default = "0" if os.environ.get("RENDER") else "1"
+    return os.environ.get("ALLOW_TABLE_BUILD", default) == "1"
+
+
+def _load_saved_table(path, signature, accept_stale=False):
     try:
         saved = json.loads(_table_path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if [tuple(x) for x in saved.get("signature", [])] != signature:
-        return None
+        if not accept_stale:
+            return None
+        logger.warning("saved market table (%s) does not match the data; using it until the daily "
+                       "workflow rebuilds it", saved.get("date"))
     return saved.get("date"), saved.get("rows")
 
 
@@ -118,9 +134,12 @@ def stock_table(path=None):
             return _TABLE["date"], _TABLE["rows"]
         sig = data_signature(path)
         if _TABLE["key"] != sig or _TABLE["path"] != str(path):
-            saved = _load_saved_table(path, sig)
+            saved = _load_saved_table(path, sig, accept_stale=not build_allowed())
             if saved is not None:
                 date, rows = saved
+            elif not build_allowed():
+                logger.error("no saved market table and building is off here; run scripts/build_daily_report.py")
+                date, rows = None, []
             else:
                 hists = D.universe(path)
                 names = D.company_names(path)

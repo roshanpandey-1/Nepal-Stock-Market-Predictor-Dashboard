@@ -168,3 +168,32 @@ def test_data_signature_reads_last_dates(root):
     tmp, dates, a, b = root
     sig = dict(market.data_signature(tmp))
     assert sig == {"AAA": dates[-1], "BBB": dates[-1]}
+
+
+def test_on_render_a_stale_saved_table_is_used_instead_of_rebuilding(root, monkeypatch):
+    from ml.analysis import market
+    tmp, dates, a, b = root
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    old_date, old_rows = market.stock_table(tmp)
+    market.write_table(tmp)
+    with open(tmp / "processed" / "AAA_features.csv", "a", newline="", encoding="utf-8") as fh:
+        fh.write("2026-10-31,1,1,1,150,1000,150000,Finance\n")      # data moved on, table not rebuilt
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.delenv("ALLOW_TABLE_BUILD", raising=False)
+    def boom(*a, **k):
+        raise AssertionError("must not rebuild on Render")
+    monkeypatch.setattr(D, "universe", boom)
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    date, rows = market.stock_table(tmp)
+    assert date == old_date and rows == old_rows
+
+
+def test_on_render_without_a_saved_table_it_returns_empty_instead_of_building(root, monkeypatch):
+    from ml.analysis import market
+    tmp, *_ = root
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setattr(D, "universe", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no build")))
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    assert market.stock_table(tmp) == (None, [])
+    monkeypatch.setenv("ALLOW_TABLE_BUILD", "1")
+    assert market.build_allowed() is True
