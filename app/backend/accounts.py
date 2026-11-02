@@ -24,7 +24,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from . import mailer
-from .database import Holding, SearchHistory, User, WatchlistItem, db
+from .database import AlertRule, Holding, SearchHistory, User, WatchlistItem, db
 from . import insights
 from . import portfolio_utils as pu
 
@@ -530,14 +530,114 @@ def api_watch_remove(ticker):
     return jsonify({"ok": True, "ticker": ticker.upper(), "watching": False})
 
 
+@acct.route("/alerts")
+@login_required
+def alerts_page():
+    return render_template("alerts.html")
+
+
+# --- JSON API: alerts ----------------------------------------------------------------
+def _alert_json(a):
+    from ml.analysis import alerts as al
+    return {"id": a.id, "ticker": a.ticker, "kind": a.kind, "threshold": a.threshold, "category": a.category,
+            "description": al.describe(a.kind, a.threshold, a.category), "active": a.active,
+            "met_now": bool(a.state) if a.kind != "announcement" else None,
+            "created": a.created_at.date().isoformat() if a.created_at else None,
+            "last_checked": a.last_checked, "last_fired": a.last_fired, "last_message": a.last_message}
+
+
+def _current_state(ticker, kind, threshold):
+    """Whether the condition already holds on the latest data, so a new rule does not fire
+    straight away for something that is already true. False when the data is unavailable."""
+    if kind == "announcement":
+        return False, None
+    from ml.analysis import alerts as al, market
+    try:
+        session, table = market.stock_table(_data_dir())
+        row = next((r for r in table if r["ticker"] == ticker), None)
+        if row is None or row["date"] != session:
+            return False, session
+        return bool(al.condition(kind, threshold, row)[0]), session
+    except Exception:
+        current_app.logger.exception("could not evaluate alert state")
+        return False, None
+
+
+@acct.route("/api/me/alerts", methods=["GET"])
+@login_required
+def api_alerts():
+    from ml.analysis import alerts as al
+    user = current_user()
+    rows = AlertRule.query.filter_by(user_id=user.id).order_by(AlertRule.created_at.desc()).all()
+    return jsonify({"ok": True, "alerts": [_alert_json(a) for a in rows], "kinds": al.kinds_for_ui(),
+                    "categories": list(al.CATEGORIES), "max": al.MAX_RULES_PER_USER, "email": user.email})
+
+
+@acct.route("/api/me/alerts", methods=["POST"])
+@login_required
+def api_alert_add():
+    from ml.analysis import alerts as al
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    ticker = str(data.get("ticker") or "").strip().upper()
+    kind = str(data.get("kind") or "")
+    try:
+        if not TICKER_RE.match(ticker) or not _known_ticker(ticker):
+            raise ValueError(f"'{ticker or '?'}' isn't a NEPSE symbol we track.")
+        threshold, category = al.validate(kind, data.get("threshold"), data.get("category"))
+        if AlertRule.query.filter_by(user_id=user.id).count() >= al.MAX_RULES_PER_USER:
+            raise ValueError(f"You can have up to {al.MAX_RULES_PER_USER} alerts. Delete one to add another.")
+        if AlertRule.query.filter_by(user_id=user.id, ticker=ticker, kind=kind, threshold=threshold,
+                                     category=category).first():
+            raise ValueError("You already have that alert.")
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    state, session = _current_state(ticker, kind, threshold)
+    rule = AlertRule(user_id=user.id, ticker=ticker, kind=kind, threshold=threshold, category=category,
+                     state=state, last_checked=session)
+    db.session.add(rule)
+    db.session.commit()
+    return jsonify({"ok": True, "alert": _alert_json(rule)}), 201
+
+
+@acct.route("/api/me/alerts/<int:alert_id>", methods=["PATCH"])
+@login_required
+def api_alert_update(alert_id):
+    user = current_user()
+    rule = AlertRule.query.filter_by(id=alert_id, user_id=user.id).first()
+    if rule is None:
+        return jsonify({"ok": False, "error": "Alert not found."}), 404
+    data = request.get_json(silent=True) or {}
+    if "active" in data:
+        rule.active = bool(data["active"])
+        if rule.active:       # resuming: don't fire at once for a condition that is already true
+            rule.state, rule.last_checked = _current_state(rule.ticker, rule.kind, rule.threshold)[0], rule.last_checked
+    db.session.commit()
+    return jsonify({"ok": True, "alert": _alert_json(rule)})
+
+
+@acct.route("/api/me/alerts/<int:alert_id>", methods=["DELETE"])
+@login_required
+def api_alert_delete(alert_id):
+    user = current_user()
+    rule = AlertRule.query.filter_by(id=alert_id, user_id=user.id).first()
+    if rule is None:
+        return jsonify({"ok": False, "error": "Alert not found."}), 404
+    db.session.delete(rule)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 # --- JSON API: portfolio ------------------------------------------------------------
 @acct.route("/api/me/portfolio")
 @login_required
 def api_portfolio():
     user = current_user()
-    quantities = {h.ticker: h.quantity for h in Holding.query.filter_by(user_id=user.id).all()}
+    held = Holding.query.filter_by(user_id=user.id).all()
+    quantities = {h.ticker: h.quantity for h in held}
+    costs = {h.ticker: h.avg_cost for h in held if h.avg_cost}
     prices = {t: _price_for(t) for t in quantities}
-    rows, totals = pu.value_holdings(quantities, prices)
+    rows, totals = pu.value_holdings(quantities, prices, costs)
     for r in rows:
         r["source"] = (prices.get(r["ticker"]) or {}).get("source")
     market_open = next((p["market_open"] for p in prices.values() if p.get("market_open") is not None), None)
@@ -549,6 +649,47 @@ def api_portfolio():
         "market_open": market_open,
         "as_of": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
+
+
+def _data_dir():
+    from . import routes as r
+    return r.DATA_DIR
+
+
+@acct.route("/api/me/portfolio/insights")
+@login_required
+def api_portfolio_insights():
+    """Rule-based checks on the user's own holdings (concentration, risk, per-stock flags)."""
+    from ml.analysis import portfolio as pi
+
+    user = current_user()
+    held = Holding.query.filter_by(user_id=user.id).all()
+    if not held:
+        return jsonify({"ok": True, "empty": True})
+    quantities = {h.ticker: h.quantity for h in held}
+    costs = {h.ticker: h.avg_cost for h in held if h.avg_cost}
+    rows, _ = pu.value_holdings(quantities, {t: _price_for(t) for t in quantities}, costs)
+    try:
+        return jsonify({"ok": True, **pi.intelligence(rows, quantities, _data_dir())})
+    except Exception:
+        current_app.logger.exception("portfolio insights failed")
+        return jsonify({"ok": False, "error": "Portfolio checks are unavailable right now."}), 500
+
+
+@acct.route("/api/me/watchlist/insights")
+@login_required
+def api_watchlist_insights():
+    from ml.analysis import portfolio as pi
+
+    user = current_user()
+    items = WatchlistItem.query.filter_by(user_id=user.id).order_by(WatchlistItem.added_at.desc()).all()
+    if not items:
+        return jsonify({"ok": True, "empty": True})
+    try:
+        return jsonify({"ok": True, **pi.watchlist_view([i.ticker for i in items], _data_dir())})
+    except Exception:
+        current_app.logger.exception("watchlist insights failed")
+        return jsonify({"ok": False, "error": "Watchlist checks are unavailable right now."}), 500
 
 
 @acct.route("/api/me/holdings", methods=["POST"])
@@ -567,6 +708,17 @@ def api_holding_save():
             raise pu.PortfolioError("Quantity must be a whole number of shares.")
         if not 1 <= qty <= MAX_QTY:
             raise pu.PortfolioError("Quantity must be at least 1.")
+        has_cost_field = "avg_cost" in data
+        avg_cost = None
+        raw_cost = str(data.get("avg_cost") if has_cost_field else "").replace(",", "").strip()
+        if raw_cost:
+            try:
+                avg_cost = float(raw_cost)
+            except ValueError:
+                raise pu.PortfolioError("Average buy price must be a number, e.g. 645.50.")
+            if not 0 < avg_cost <= 1_000_000:
+                raise pu.PortfolioError("Average buy price must be more than 0.")
+            avg_cost = round(avg_cost, 2)
         existing = Holding.query.filter_by(user_id=user.id, ticker=ticker).first()
         if existing is None:
             if not _known_ticker(ticker):
@@ -576,11 +728,14 @@ def api_holding_save():
     except pu.PortfolioError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     if existing is None:
-        db.session.add(Holding(user_id=user.id, ticker=ticker, quantity=qty))
+        db.session.add(Holding(user_id=user.id, ticker=ticker, quantity=qty, avg_cost=avg_cost))
     else:
         existing.quantity = qty
+        if has_cost_field:           # leave the stored cost alone when the field isn't sent
+            existing.avg_cost = avg_cost
     db.session.commit()
-    return jsonify({"ok": True, "ticker": ticker, "quantity": qty, "updated": existing is not None}), 201
+    return jsonify({"ok": True, "ticker": ticker, "quantity": qty, "avg_cost": avg_cost,
+                    "updated": existing is not None}), 201
 
 
 @acct.route("/api/me/holdings/<ticker>", methods=["DELETE"])

@@ -82,7 +82,7 @@ def create_app(test_config=None):
 def _init_accounts(app):
     """Accounts are optional infrastructure: if anything here fails the public
     dashboard still starts and serves."""
-    from app.backend.database import db
+    from app.backend.database import db, ensure_schema
     from app.backend.accounts import acct
     db.init_app(app)
     app.register_blueprint(acct)
@@ -102,6 +102,7 @@ def _init_accounts(app):
     with app.app_context():
         try:
             db.create_all()
+            ensure_schema(db.engine)
         except Exception:
             logger.exception("Could not create/connect to the accounts database; "
                              "login pages will show an 'unavailable' message.")

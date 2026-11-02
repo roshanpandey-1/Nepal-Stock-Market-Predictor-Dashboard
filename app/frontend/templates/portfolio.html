@@ -15,6 +15,7 @@
 <div class="row g-2 mb-3" id="pf-tiles">
   <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Value at LTP</div><div class="value" id="pf-value">—</div></div></div>
   <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label" id="pf-day-label">Today's change</div><div class="value" id="pf-day">—</div></div></div>
+  <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label" id="pf-pl-label">Profit / loss</div><div class="value" id="pf-pl">—</div></div></div>
   <div class="col-6 col-lg"><div class="stat-tile sm"><div class="label">Scrips held</div><div class="value" id="pf-count">—</div></div></div>
 </div>
 
@@ -26,23 +27,33 @@
 
 <section id="pf-holdings" role="tabpanel" aria-labelledby="tab-holdings">
 <div class="row g-3">
-  <div class="col-xl-8">
+  <div class="col-12">
     <div class="card-panel h-100">
       <h3>Holdings <span class="src-badge" id="pf-source">—</span></h3>
       <div class="table-responsive" id="holdings-wrap"><span class="text-dim">Loading…</span></div>
       <p class="text-dim mt-2 mb-0" style="font-size:0.74rem;">
         Last closing price is the previous session's close while the market is open; once it closes, LTP and last close are the same.
-        Use <strong>Edit</strong> to change a quantity.
+        Use <strong>Edit</strong> to change a quantity or buy price.
+      </p>
+      <p class="text-dim mt-1 mb-0" style="font-size:0.74rem;">
+        Profit / loss uses the average buy price you typed in, so it is only shown for holdings where you entered one.
+        It is before brokerage, SEBON and DP charges and capital gains tax, so it overstates what you would actually keep.
+        If you received bonus or right shares, enter your adjusted average price.
       </p>
     </div>
   </div>
-  <div class="col-xl-4">
+  <div class="col-12 col-md-6 col-xl-4">
     <div class="card-panel h-100">
       <h3>By sector</h3>
       <div style="position:relative; max-width:240px; margin:0 auto;"><canvas id="sector-chart" height="220"></canvas></div>
       <div id="sector-legend" class="mt-3"></div>
     </div>
   </div>
+</div>
+
+<div class="card-panel mt-3">
+  <h3>Portfolio check</h3>
+  <div id="pf-insights"><span class="text-dim">Loading…</span></div>
 </div>
 
 </section>
@@ -129,7 +140,10 @@
           <label class="field"><span>Quantity <em>(shares you own)</em></span>
             <input type="number" name="quantity" min="1" step="1" required inputmode="numeric">
           </label>
-          <p class="text-dim" style="font-size:.76rem;margin:0 0 6px;">If you already hold this symbol, the quantity replaces the old one.</p>
+          <label class="field"><span>Average buy price <em>(optional, Rs per share)</em></span>
+            <input type="number" name="avg_cost" min="0.01" step="0.01" inputmode="decimal" placeholder="e.g. 645.50">
+          </label>
+          <p class="text-dim" style="font-size:.76rem;margin:0 0 6px;">If you already hold this symbol, the quantity and price replace the old ones. Leave the price empty if you'd rather not enter it.</p>
           <div class="form-msg" id="tx-msg" role="alert"></div>
         </div>
         <div class="modal-footer">
@@ -142,5 +156,6 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script>initPortfolioPage();</script>
+<script src="{{ url_for('static', filename='js/account_insights.js') }}"></script>
+<script>initPortfolioInsights(); initPortfolioPage();</script>
 {% endblock %}

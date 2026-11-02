@@ -70,6 +70,25 @@ is handy locally. Emails from a free Gmail sender can land in spam.
 
 A Google account with the same email as an existing account is linked to it.
 
+## Alert emails
+
+Alerts are set on the website (`/alerts`) and checked by the daily GitHub workflow, because Render's free tier
+sleeps and has no scheduler. The workflow step "Send alert emails" reads the accounts database directly, so add
+these as **repository secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `DATABASE_URL` | The same PostgreSQL connection string Render uses |
+| `BREVO_API_KEY` | The same Brevo API key as the password-reset emails |
+| `MAIL_SENDER` | The same verified sender address |
+| `SITE_URL` | Optional: the site address used in the email links (defaults to the Render URL) |
+
+Without `DATABASE_URL` the step does nothing, and it can never stop the price refresh (it is `continue-on-error`).
+Secrets are encrypted by GitHub and are never in the code or the browser. The script prints counts only, never
+addresses or message text, and each email contains only that person's own alerts. A rule fires when its condition
+turns from false to true; if an email is not accepted by Brevo the rule is left unchanged and retried the next day.
+Try it without sending anything: `DATABASE_URL=... python scripts/run_alerts.py --dry-run`.
+
 ## Keeping it awake
 
 The free tier sleeps after 15 minutes without traffic. An [UptimeRobot](https://uptimerobot.com) HTTP monitor on

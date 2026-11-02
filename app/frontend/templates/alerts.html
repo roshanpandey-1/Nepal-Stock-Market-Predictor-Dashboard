@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Alerts · NEPSE Intelligence{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">My account</div>
+    <h1>My alerts</h1>
+    <p class="page-sub">Get an email when a stock meets a condition you set. Conditions are checked once a day, after the market closes and our prices are updated.</p>
+  </div>
+</div>
+
+<div class="card-panel">
+  <h3>New alert</h3>
+  <form id="alert-form" class="alert-form" autocomplete="off" novalidate>
+    <label class="field"><span>Stock</span>
+      <span class="ts-wrap d-block">
+        <input type="text" name="ticker" id="alert-ticker" maxlength="40" required placeholder="e.g. NABIL">
+        <span class="nav-search-results ts-results" id="alert-ticker-results"></span>
+      </span>
+    </label>
+    <label class="field"><span>When</span>
+      <select name="kind" id="alert-kind" aria-label="Alert type"></select>
+    </label>
+    <label class="field" id="alert-value-wrap"><span id="alert-value-label">Level</span>
+      <input type="number" name="threshold" id="alert-threshold" step="any" inputmode="decimal">
+    </label>
+    <label class="field" id="alert-cat-wrap" hidden><span>Only for</span>
+      <select name="category" id="alert-category" aria-label="Announcement category"><option value="">Any announcement or headline</option></select>
+    </label>
+    <button class="btn-primary-nepse sm" type="submit" id="alert-submit">Add alert</button>
+  </form>
+  <div class="form-msg" id="alert-msg" role="status"></div>
+</div>
+
+<div class="card-panel">
+  <h3>Your alerts <span class="text-dim" id="alert-count" style="font-size:.8rem;font-weight:400;"></span></h3>
+  <div id="alert-list"><span class="text-dim">Loading…</span></div>
+</div>
+
+<div class="limitation-note">
+  <strong>How alerts work.</strong> They use end-of-day prices, so a price that touches your level during the day
+  but closes back below it will not trigger anything. Each condition is checked once a day; you are emailed when it
+  turns from false to true (not again every day it stays true), and it is re-armed once the condition stops being true.
+  A stock that did not trade that day is skipped. Headline alerts match a company by name, so some items may be missed.
+  Emails go only to <span id="alert-email">your account address</span>. Delete an alert to stop its emails.
+  Alerts are a reminder to look at a stock, not advice to buy or sell.
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+<script>initAlertsPage();</script>
+{% endblock %}

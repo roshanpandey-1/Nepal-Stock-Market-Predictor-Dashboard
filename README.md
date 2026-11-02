@@ -31,6 +31,12 @@ The project's main point is honesty about what the models can and cannot do. Eve
 | 🔍 **Why this signal?** | A panel on each stock page showing which inputs pushed the model toward Buy or Sell, using SHAP-style attributions (TreeSHAP for XGBoost, expected gradients for the LSTMs) precomputed after every price refresh so the web server stays light |
 | 📊 **Honest backtest page** | Out-of-sample tests on every stock: signal strength with confidence ranges and trading results after NEPSE fees and tax |
 | 📈 **30-day price range** | A Prophet range of likely prices, shown with its tested accuracy and clearly labelled as not a prediction |
+| 🔬 **Stock analysis report** | A rule-based report on every stock page: returns, volatility, trend, support and resistance, volume and indicator observations, each with the rule behind it (no AI model involved) |
+| 📰 **Daily market report** | Written by fixed rules from the day's closing data and built by the daily workflow; says plainly that its totals cover tracked stocks only, not the official NEPSE index |
+| 🔎 **Screener and compare** | Research filters (trend, RSI, volume, P/E, P/B and more) and a side-by-side comparison of up to five stocks; strengths and weaknesses are only relative to the group |
+| 🧾 **Reported fundamentals and news** | EPS, P/E, book value and dividends as reported on Merolagani (weekly), plus announcement and news headlines from ShareSansar (daily); figures show their source and date and are never estimated |
+| 🧮 **Portfolio and watchlist checks** | Optional buy price for profit and loss, concentration, volatility and drawdown of your holdings, and rule-based flags per stock and for your watchlist |
+| 🔔 **Alerts** | Email when a stock closes above or below a price, moves a set percentage, has a volume spike, crosses an average, or posts an announcement; checked once a day on end-of-day data |
 | 👤 **Accounts** | Email/password or Google sign-in, password reset by email, watchlist, portfolio with live value and a sector breakdown, stocks-to-research ideas |
 | ⚡ **Live market** | Live NEPSE index, market breadth, top gainers and losers, per-stock quotes and price charts |
 | 🤖 **Automation** | GitHub Actions refresh prices daily and retrain the models and forecasts weekly; Render redeploys on every push |
@@ -160,6 +166,8 @@ All scripts run from the repo root.
 | Workflow | Schedule | What it does |
 |---|---|---|
 | Refresh daily prices | Mon–Fri, after market close | Fetches new prices into the full-history release, refreshes `deploy_data/processed` and rebuilds the signal explanations |
+| Send alert emails (a step of the daily workflow) | Mon–Fri, after the refresh | Emails people whose alerts fired; needs the `DATABASE_URL`, `BREVO_API_KEY` and `MAIL_SENDER` repository secrets, and does nothing without them |
+| Weekly fundamentals | Sunday | Collects reported EPS, P/E, book value and dividends from Merolagani |
 | Weekly forecasts and retraining | Saturday | Rebuilds the price ranges, retrains every sector, promotes a model only if it passes the quality gate, and rebuilds the explanations |
 | Monthly backtest | 1st of each month | Re-runs the one-stock-per-sector backtest |
 | Class-weight experiment | Manual | Compares class-weighted training with the deployed models; deploys nothing |

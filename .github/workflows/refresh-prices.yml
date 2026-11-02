@@ -78,6 +78,20 @@ jobs:
         continue-on-error: true
         run: python scripts/build_daily_report.py --data-dir deploy_data --capture-index
 
+      # Emails people whose alerts (set on the website) fired on today's data. It needs the accounts
+      # database and the email key as repository secrets; without DATABASE_URL it does nothing.
+      # continue-on-error: an email problem must never stop the new prices being saved.
+      - name: Send alert emails
+        continue-on-error: true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          MAIL_SENDER: ${{ secrets.MAIL_SENDER }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: |
+          pip install flask==3.1.0 Flask-SQLAlchemy==3.1.1 psycopg2-binary==2.9.9 requests==2.31.0
+          python scripts/run_alerts.py --data-dir deploy_data
+
       - name: Upload updated full history
         run: |
           python scripts/data_snapshot.py pack

@@ -351,3 +351,142 @@ def test_run_py_defaults_to_the_deployed_snapshot(monkeypatch, tmp_path):
 
 def test_run_py_respects_an_explicit_data_dir(monkeypatch, tmp_path):
     assert _run_py_data_dir(monkeypatch, tmp_path, "data") == "data"
+
+
+# ---------------- buy price and profit/loss ----------------
+def test_profit_loss_only_for_holdings_with_a_cost():
+    rows, tot = value_holdings({"A": 10, "B": 5}, {"A": {"ltp": 120, "lcp": 120}, "B": {"ltp": 50, "lcp": 50}},
+                               {"A": 100.0})
+    a = next(r for r in rows if r["ticker"] == "A")
+    b = next(r for r in rows if r["ticker"] == "B")
+    assert (a["cost"], a["pl"], a["pl_pct"]) == (1000.0, 200.0, 20.0)
+    assert b["avg_cost"] is None and b["pl"] is None and b["pl_pct"] is None
+    assert tot["pl"] == 200.0 and tot["cost_count"] == 1 and tot["cost"] == 1000.0     # B is left out, not counted as 0
+
+
+def test_no_costs_means_no_profit_loss_totals():
+    _, tot = value_holdings({"A": 10}, {"A": {"ltp": 120, "lcp": 120}})
+    assert tot["pl"] is None and tot["pl_pct"] is None and tot["cost_count"] == 0
+
+
+def test_holding_cost_saved_kept_and_cleared(client):
+    _signup(client)
+    assert _j(client, "post", "/api/me/holdings", {"ticker": "NABIL", "quantity": 10, "avg_cost": "900.5"}).status_code == 201
+    h = client.get("/api/me/portfolio").get_json()["holdings"][0]
+    assert h["avg_cost"] == 900.5 and h["pl"] == 995.0 and h["pl_pct"] == 11.05        # (1000-900.5)*10
+    # a request without the field leaves the stored cost alone
+    _j(client, "post", "/api/me/holdings", {"ticker": "NABIL", "quantity": 20})
+    assert client.get("/api/me/portfolio").get_json()["holdings"][0]["avg_cost"] == 900.5
+    # an empty value clears it
+    _j(client, "post", "/api/me/holdings", {"ticker": "NABIL", "quantity": 20, "avg_cost": ""})
+    assert client.get("/api/me/portfolio").get_json()["holdings"][0]["avg_cost"] is None
+    for bad in ("abc", "0", "-5"):
+        assert _j(client, "post", "/api/me/holdings", {"ticker": "NABIL", "quantity": 20, "avg_cost": bad}).status_code == 400
+
+
+def test_schema_migration_adds_missing_column(tmp_path):
+    from sqlalchemy import create_engine, inspect, text
+    from app.backend.database import ensure_schema
+
+    eng = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    with eng.begin() as c:
+        c.execute(text("CREATE TABLE holdings (id INTEGER PRIMARY KEY, user_id INTEGER, ticker VARCHAR(20), quantity INTEGER)"))
+        c.execute(text("INSERT INTO holdings (user_id, ticker, quantity) VALUES (1, 'NABIL', 10)"))
+    ensure_schema(eng)
+    ensure_schema(eng)                                  # running twice is harmless
+    assert "avg_cost" in {c["name"] for c in inspect(eng).get_columns("holdings")}
+    with eng.begin() as c:
+        assert c.execute(text("SELECT quantity, avg_cost FROM holdings")).fetchone() == (10, None)
+
+
+# ---------------- portfolio and watchlist checks ----------------
+needs_snapshot = pytest.mark.skipif(not (Path("deploy_data") / "processed" / "NABIL_features.csv").exists(),
+                                    reason="deploy_data snapshot not present")
+
+
+def test_insights_require_login_and_empty_states(client):
+    assert client.get("/api/me/portfolio/insights").status_code == 401
+    assert client.get("/api/me/watchlist/insights").status_code == 401
+    _signup(client)
+    assert client.get("/api/me/portfolio/insights").get_json()["empty"] is True
+    assert client.get("/api/me/watchlist/insights").get_json()["empty"] is True
+
+
+@needs_snapshot
+def test_insights_use_only_the_signed_in_users_data(client, monkeypatch):
+    from app.backend import routes
+    monkeypatch.setattr(routes, "DATA_DIR", Path("deploy_data"))
+    _signup(client, "a@gmail.com")
+    _j(client, "post", "/api/me/holdings", {"ticker": "NABIL", "quantity": 100})
+    _j(client, "post", "/api/me/holdings", {"ticker": "SCB", "quantity": 50})
+    _j(client, "post", "/api/me/watchlist", {"ticker": "NABIL"})
+    p = client.get("/api/me/portfolio/insights").get_json()
+    assert p["ok"] and [h["ticker"] for h in p["holdings"]] == ["NABIL", "SCB"]
+    assert p["concentration"]["holdings"] == 2 and p["risk"]["volatility_pct"] > 0
+    assert "Not a recommendation" in p["disclaimer"] or "not a recommendation" in p["disclaimer"].lower()
+    w = client.get("/api/me/watchlist/insights").get_json()
+    assert w["ok"] and [r["ticker"] for r in w["rows"]] == ["NABIL"]
+    # another account sees none of it
+    client.post("/logout", data={"csrf_token": _token(client)})
+    _signup(client, "b@gmail.com")
+    assert client.get("/api/me/portfolio/insights").get_json()["empty"] is True
+    assert client.get("/api/me/watchlist/insights").get_json()["empty"] is True
+
+
+# ---------------- alerts API ----------------
+@pytest.fixture
+def alerts_client(client, monkeypatch):
+    from app.backend import accounts
+    monkeypatch.setattr(accounts, "_current_state", lambda ticker, kind, threshold: (False, "2026-10-30"))
+    return client
+
+
+def test_alerts_need_login(client):
+    assert client.get("/api/me/alerts").status_code == 401
+    assert client.get("/alerts").status_code == 302
+
+
+def test_alert_add_validate_duplicate_and_limit(alerts_client):
+    c = alerts_client
+    _signup(c)
+    ok = _j(c, "post", "/api/me/alerts", {"ticker": "nabil", "kind": "price_above", "threshold": "1,100"})
+    assert ok.status_code == 201 and ok.get_json()["alert"]["description"] == "closes at or above Rs 1,100.00"
+    assert _j(c, "post", "/api/me/alerts", {"ticker": "NABIL", "kind": "price_above", "threshold": 1100}).status_code == 400   # duplicate
+    for body in ({"ticker": "NOPE1", "kind": "price_above", "threshold": 5},          # unknown symbol
+                 {"ticker": "NABIL", "kind": "bogus"},
+                 {"ticker": "NABIL", "kind": "price_above", "threshold": "abc"},
+                 {"ticker": "NABIL", "kind": "rsi_above", "threshold": 5}):
+        assert _j(c, "post", "/api/me/alerts", body).status_code == 400
+    assert _j(c, "post", "/api/me/alerts", {"ticker": "NABIL", "kind": "macd_cross_up"}).status_code == 201     # no level needed
+    assert _j(c, "post", "/api/me/alerts", {"ticker": "SCB", "kind": "announcement", "category": "dividend"}).status_code == 201
+    d = c.get("/api/me/alerts").get_json()
+    assert len(d["alerts"]) == 3 and d["max"] == 25 and d["email"] == "a@gmail.com" and d["kinds"]
+    for i in range(22):
+        assert _j(c, "post", "/api/me/alerts", {"ticker": "SCB", "kind": "price_below", "threshold": 10 + i}).status_code == 201
+    assert _j(c, "post", "/api/me/alerts", {"ticker": "SCB", "kind": "price_below", "threshold": 99}).status_code == 400   # over the cap
+
+
+def test_alert_pause_resume_delete_and_isolation(alerts_client):
+    c = alerts_client
+    _signup(c, "a@gmail.com")
+    aid = _j(c, "post", "/api/me/alerts", {"ticker": "NABIL", "kind": "move_up", "threshold": 5}).get_json()["alert"]["id"]
+    assert _j(c, "patch", f"/api/me/alerts/{aid}", {"active": False}).get_json()["alert"]["active"] is False
+    assert _j(c, "patch", f"/api/me/alerts/{aid}", {"active": True}).get_json()["alert"]["active"] is True
+    c.post("/logout", data={"csrf_token": _token(c)})
+    _signup(c, "b@gmail.com")
+    assert c.get("/api/me/alerts").get_json()["alerts"] == []                           # B sees none of A's
+    assert _j(c, "delete", f"/api/me/alerts/{aid}").status_code == 404                  # and cannot delete it
+    assert _j(c, "patch", f"/api/me/alerts/{aid}", {"active": False}).status_code == 404
+
+
+@needs_snapshot
+def test_new_alert_for_an_already_true_condition_does_not_fire_immediately(client, monkeypatch):
+    from app.backend import routes
+    from app.backend.database import AlertRule
+    monkeypatch.setattr(routes, "DATA_DIR", Path("deploy_data"))
+    _signup(client)
+    _j(client, "post", "/api/me/alerts", {"ticker": "NABIL", "kind": "price_above", "threshold": 1})       # surely true
+    _j(client, "post", "/api/me/alerts", {"ticker": "NABIL", "kind": "price_below", "threshold": 1})       # surely false
+    a = {x["kind"]: x for x in client.get("/api/me/alerts").get_json()["alerts"]}
+    assert a["price_above"]["met_now"] is True and a["price_below"]["met_now"] is False
+    assert a["price_above"]["last_checked"] is not None

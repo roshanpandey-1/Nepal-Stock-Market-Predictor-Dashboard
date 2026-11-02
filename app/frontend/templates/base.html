@@ -39,6 +39,7 @@
 {%- elif name == 'plus' -%}<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>
 {%- elif name == 'shield' -%}<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>
 {%- elif name == 'doc' -%}<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>
+{%- elif name == 'bell' -%}<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
 {%- elif name == 'search' -%}<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
 {%- elif name == 'logout' -%}<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>
 {%- endif -%}
@@ -85,6 +86,7 @@
       {% if current_user %}
       <a class="side-link {% if ep == 'acct.watchlist_page' %}active{% endif %}" href="{{ url_for('acct.watchlist_page') }}" {% if ep == 'acct.watchlist_page' %}aria-current="page"{% endif %}>{{ icon('star') }}<span>Watchlist</span></a>
       <a class="side-link {% if ep == 'acct.portfolio' %}active{% endif %}" href="{{ url_for('acct.portfolio') }}" {% if ep == 'acct.portfolio' %}aria-current="page"{% endif %}>{{ icon('wallet') }}<span>Portfolio</span></a>
+      <a class="side-link {% if ep == 'acct.alerts_page' %}active{% endif %}" href="{{ url_for('acct.alerts_page') }}" {% if ep == 'acct.alerts_page' %}aria-current="page"{% endif %}>{{ icon('bell') }}<span>Alerts</span></a>
       <a class="side-link {% if ep == 'acct.profile' %}active{% endif %}" href="{{ url_for('acct.profile') }}" {% if ep == 'acct.profile' %}aria-current="page"{% endif %}>{{ icon('user') }}<span>Profile</span></a>
       {% else %}
       <a class="side-link {% if ep == 'acct.login' %}active{% endif %}" href="{{ url_for('acct.login', next=request.path) if ep not in ('acct.login','acct.register') else url_for('acct.login') }}">{{ icon('login') }}<span>Log in</span></a>
@@ -141,6 +143,7 @@
             <li><span class="dropdown-item-text user-menu-email">{{ current_user.email }}</span></li>
             <li><a class="dropdown-item" href="{{ url_for('acct.watchlist_page') }}">{{ icon('star') }} Watchlist</a></li>
             <li><a class="dropdown-item" href="{{ url_for('acct.portfolio') }}">{{ icon('wallet') }} Portfolio</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('acct.alerts_page') }}">{{ icon('bell') }} Alerts</a></li>
             <li><a class="dropdown-item" href="{{ url_for('acct.profile') }}">{{ icon('user') }} Profile</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>

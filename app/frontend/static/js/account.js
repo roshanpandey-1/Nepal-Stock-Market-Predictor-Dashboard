@@ -125,6 +125,7 @@ async function initWatchlistPage() {
       const { items } = await acctApi("/api/me/watchlist");
       if (!items.length) {
         body.innerHTML = `<p class="text-dim mb-0">Nothing here yet. Add a symbol above, or press <strong>☆ Watch</strong> on any stock page.</p>`;
+        document.dispatchEvent(new CustomEvent("watchlist:loaded", { detail: items }));
         return;
       }
       body.innerHTML = `<div class="table-responsive"><table class="data-table">
@@ -139,6 +140,7 @@ async function initWatchlistPage() {
           <td class="num"><button class="btn-x" data-remove="${_esc(r.ticker)}" title="Remove ${_esc(r.ticker)}" aria-label="Remove ${_esc(r.ticker)}">✕</button></td>
         </tr>`).join("")}</tbody></table></div>`;
       _fillSignals(body);
+      document.dispatchEvent(new CustomEvent("watchlist:loaded", { detail: items }));
     } catch (e) {
       body.innerHTML = `<p class="text-dim mb-0">${_esc(e.message)}</p>`;
     }
@@ -192,7 +194,18 @@ function _renderPortfolio(d) {
   // After the close it is still today's move (LTP vs previous close), so say which session it is.
   document.getElementById("pf-day-label").textContent =
     d.market_open === false ? "Change (last session)" : "Today's change";
+  const plEl = document.getElementById("pf-pl");
+  if (plEl) {
+    if (t.pl == null) { plEl.textContent = "—"; plEl.className = "value"; }
+    else {
+      plEl.innerHTML = `${_esc(_signed(t.pl))}${t.pl_pct == null ? "" : ` <small>(${_esc(_signedPct(t.pl_pct))})</small>`}`;
+      plEl.className = "value " + _signCls(t.pl);
+    }
+    document.getElementById("pf-pl-label").textContent = t.pl == null ? "Profit / loss (add buy prices)"
+      : t.cost_count < t.count ? `Profit / loss (${t.cost_count} of ${t.count} holdings)` : "Profit / loss";
+  }
   setTile("pf-count", String(t.count));
+  document.dispatchEvent(new CustomEvent("portfolio:loaded", { detail: d.holdings }));
   document.getElementById("pf-source").textContent = d.market_open === true
     ? `market open · live · ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kathmandu" })}`
     : d.market_open === false ? "market closed" : "last close";
@@ -203,7 +216,8 @@ function _renderPortfolio(d) {
   } else {
     wrap.innerHTML = `<table class="data-table holdings-table">
       <thead><tr><th>#</th><th>Scrip</th><th class="num">Balance</th>
-        <th class="num">Last closing price</th><th class="num">Value at last close</th><th class="num">LTP</th><th class="num">Value at LTP</th>
+        <th class="num">Last close</th><th class="num">Value at close</th><th class="num">LTP</th><th class="num">Value at LTP</th>
+        <th class="num">Avg buy</th><th class="num">Profit / loss</th>
         <th class="num">Today</th><th>Signal</th><th></th></tr></thead>
       <tbody>${d.holdings.map((r, i) => `<tr>
         <td class="text-dim">${i + 1}</td>
@@ -214,17 +228,20 @@ function _renderPortfolio(d) {
         <td class="num">${_rs(r.value_lcp)}</td>
         <td class="num">${_rs(r.ltp)}</td>
         <td class="num">${_rs(r.value_ltp)}</td>
+        <td class="num">${r.avg_cost == null ? `<span class="text-dim">—</span>` : _rs(r.avg_cost)}</td>
+        <td class="num ${_signCls(r.pl)}">${r.pl == null ? `<span class="text-dim">—</span>` : `${_signed(r.pl)} <small>(${_signedPct(r.pl_pct)})</small>`}</td>
         <td class="num ${_signCls(r.day_pl)}">${_signed(r.day_pl)}</td>
         <td data-signal-for="${_esc(r.ticker)}"><span class="text-dim">…</span></td>
         <td class="num text-nowrap">
-          <button class="btn-link-sm" data-edit="${_esc(r.ticker)}" data-qty="${r.quantity}">Edit</button>
+          <button class="btn-link-sm" data-edit="${_esc(r.ticker)}" data-qty="${r.quantity}" data-cost="${r.avg_cost == null ? "" : r.avg_cost}">Edit</button>
           <button class="btn-x" data-del="${_esc(r.ticker)}" title="Remove ${_esc(r.ticker)}" aria-label="Remove ${_esc(r.ticker)}">✕</button>
         </td>
       </tr>`).join("")}</tbody>
       <tfoot><tr>
         <td></td><td><strong>Total</strong></td><td></td><td></td>
         <td class="num"><strong>${_rs(t.value_lcp)}</strong></td><td></td>
-        <td class="num"><strong>${_rs(t.value_ltp)}</strong></td>
+        <td class="num"><strong>${_rs(t.value_ltp)}</strong></td><td></td>
+        <td class="num ${_signCls(t.pl)}">${t.pl == null ? "" : `<strong>${_signed(t.pl)}</strong>`}</td>
         <td class="num ${_signCls(t.day_pl)}"><strong>${_signed(t.day_pl)}</strong></td><td></td><td></td>
       </tr></tfoot></table>`;
     _fillSignals(wrap);
@@ -288,6 +305,7 @@ async function initPortfolioPage() {
     msg.textContent = ""; msg.className = "form-msg";
     form.ticker.value = prefill.ticker || "";
     form.quantity.value = prefill.quantity || "";
+    form.avg_cost.value = prefill.avg_cost || "";
     document.getElementById("tx-modal-title").textContent = prefill.quantity ? `Edit ${prefill.ticker}` : "Add holding";
     // focus once Bootstrap has finished showing the dialog (it moves focus itself on "shown")
     modalEl.addEventListener("shown.bs.modal", () => (prefill.ticker ? form.quantity : form.ticker).focus(), { once: true });
@@ -304,8 +322,9 @@ async function initPortfolioPage() {
     try {
       await acctApi("/api/me/holdings", { method: "POST", body: {
         ticker: await _resolveSymbol(fd.get("ticker")), quantity: fd.get("quantity"),
+        avg_cost: fd.get("avg_cost"),
       } });
-      form.quantity.value = ""; form.ticker.value = "";
+      form.quantity.value = ""; form.ticker.value = ""; form.avg_cost.value = "";
       modal().hide();
       await load();
     } catch (err) {
@@ -319,7 +338,7 @@ async function initPortfolioPage() {
 
   wrap.addEventListener("click", async (e) => {
     const ed = e.target.closest("[data-edit]");
-    if (ed) { openModal({ ticker: ed.dataset.edit, quantity: ed.dataset.qty }); return; }
+    if (ed) { openModal({ ticker: ed.dataset.edit, quantity: ed.dataset.qty, avg_cost: ed.dataset.cost }); return; }
     const b = e.target.closest("[data-del]");
     if (!b || !confirm(`Remove ${b.dataset.del} from your portfolio?`)) return;
     b.disabled = true;

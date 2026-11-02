@@ -1138,3 +1138,26 @@ details#explain-details > summary::-webkit-details-marker { color: var(--text-di
 .news-filter .field { min-width: 180px; }
 .news-filter select, .news-filter input { width: 100%; background: var(--input-bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 0.86rem; }
 .news-filter button { margin-bottom: 12px; }
+
+/* ---- portfolio and watchlist checks ---- */
+.pi-h { font-size: 0.95rem; font-weight: 700; margin: 18px 0 8px; }
+.pi-h:first-of-type { margin-top: 4px; }
+.pi-flags { min-width: 220px; }
+.pi-flags li.pi-info { border-left-color: var(--green); }
+.pi-news { list-style: none; margin: 0; padding: 0; font-size: 0.82rem; min-width: 220px; }
+.pi-news li { margin-bottom: 6px; display: flex; flex-direction: column; }
+#wl-insights:empty { display: none; }
+.alert-form { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(220px, 2fr) minmax(120px, 1fr) auto; gap: 12px; align-items: end; }
+.alert-form .field { margin: 0; }
+.alert-form .field input, .alert-form .field select { width: 100%; height: 42px; padding: 0 12px; font-size: 0.92rem; color: var(--text);
+  background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; }
+.alert-form .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.alert-form .btn-primary-nepse { height: 42px; }
+@media (max-width: 767px) { .alert-form { grid-template-columns: 1fr; } .alert-form button { width: 100%; } }
+.holdings-table th, .holdings-table td { padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+.holdings-table td small { font-size: 0.72rem; }
+.pi-detail td { padding-top: 0; border-top: 0; }
+.pi-detail-grid { display: flex; flex-wrap: wrap; gap: 16px 28px; }
+.pi-detail-grid > div { flex: 1 1 280px; min-width: 0; }
+.pi-sub { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 4px; }
+.alert-form .ts-wrap { margin-bottom: 0 !important; }
