@@ -136,3 +136,35 @@ def test_market_table_is_built_once_for_concurrent_first_requests(root, monkeypa
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert len(calls) == 1 and len({id(o[1]) for o in out}) == 1
+
+
+def test_saved_market_table_is_used_until_the_data_changes(root, monkeypatch):
+    from ml.analysis import market
+    tmp, dates, a, b = root
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    built_date, built_rows = market.stock_table(tmp)
+    f = market.write_table(tmp)
+    assert f.name == "stock_table.json"
+
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    def boom(*a, **k):
+        raise AssertionError("must read the saved table, not every file")
+    monkeypatch.setattr(D, "universe", boom)
+    date, rows = market.stock_table(tmp)
+    assert date == built_date and rows == built_rows
+
+    # a new session in one file makes the saved table stale, so it is rebuilt
+    with open(tmp / "processed" / "AAA_features.csv", "a", newline="", encoding="utf-8") as fh:
+        fh.write("2026-10-31,1,1,1,150,1000,150000,Finance\n")
+    monkeypatch.undo()
+    D._CACHE.clear()
+    market._TABLE.update(rows=None, key=None, path=None, checked=0.0)
+    date, rows = market.stock_table(tmp)
+    assert date == "2026-10-31" and next(r for r in rows if r["ticker"] == "AAA")["close"] == 150
+
+
+def test_data_signature_reads_last_dates(root):
+    from ml.analysis import market
+    tmp, dates, a, b = root
+    sig = dict(market.data_signature(tmp))
+    assert sig == {"AAA": dates[-1], "BBB": dates[-1]}

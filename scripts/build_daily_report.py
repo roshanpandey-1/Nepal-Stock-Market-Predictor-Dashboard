@@ -100,6 +100,8 @@ def main(argv=None):
     text = json.dumps(report, ensure_ascii=False, indent=1)
     (out_dir / f"{report['date']}.json").write_text(text, encoding="utf-8")
     (out_dir / "latest.json").write_text(text, encoding="utf-8")
+    # The finished all-stocks table, so the website reads one file instead of ~270.
+    market.write_table(data_dir)
 
     dated = sorted(p for p in out_dir.glob("????-??-??.json"))
     for old in dated[:-KEEP_REPORTS]:

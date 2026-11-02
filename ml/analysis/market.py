@@ -5,6 +5,7 @@ project tracks (about 270 listed equities), computed from completed daily
 sessions. They are NOT the official NEPSE index or NEPSE's published market
 totals, and are labelled that way wherever they are shown.
 """
+import json
 import threading
 import time
 
@@ -61,16 +62,53 @@ def stock_row(h, names):
 
 
 _TABLE = {"key": None, "rows": None, "date": None, "checked": 0.0, "path": None}
-RECHECK_SECONDS = 60   # data changes once a day; don't stat 270 files on every request
-
-
+RECHECK_SECONDS = 60   # data changes once a day; don't re-check 270 files on every request
+TABLE_FILE = ("reports", "market", "stock_table.json")
 _TABLE_LOCK = threading.Lock()
 
 
+def _last_date(f):
+    """Date on the last line of a feature CSV, reading only the end of the file."""
+    try:
+        with open(f, "rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - 4096))
+            lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+        return lines[-1].split(b",", 1)[0].decode("ascii", "replace")[:10] if lines else None
+    except OSError:
+        return None
+
+
+def data_signature(path=None):
+    """[(ticker, latest date)] for every tracked stock, from the files' last lines only.
+    Changes whenever a new session is added, and is the same on every machine."""
+    d = D.processed_dir(path)
+    return [(t, _last_date(d / f"{t}_features.csv")) for t in D.tickers(path)]
+
+
+def _table_path(path):
+    return D.data_dir(path).joinpath(*TABLE_FILE)
+
+
+def _load_saved_table(path, signature):
+    try:
+        saved = json.loads(_table_path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if [tuple(x) for x in saved.get("signature", [])] != signature:
+        return None
+    return saved.get("date"), saved.get("rows")
+
+
 def stock_table(path=None):
-    """(market_date, [stock_row, ...]) for every tracked stock. Cached until any file changes
-    (files are re-checked at most once a minute). A lock makes concurrent first requests wait
-    for one build instead of each reading all the files."""
+    """(market_date, [stock_row, ...]) for every tracked stock.
+
+    Building it reads and analyses all ~270 files, which takes many seconds on a small
+    server (long enough to miss its health checks). So the daily workflow saves the finished
+    table (write_table) and this reads that file whenever it matches the data; otherwise it
+    builds the table. Re-checked at most once a minute; a lock makes concurrent first
+    requests wait for one build."""
     now = time.monotonic()
     if _TABLE["rows"] is not None and _TABLE["path"] == str(path) and now - _TABLE["checked"] < RECHECK_SECONDS:
         return _TABLE["date"], _TABLE["rows"]
@@ -78,14 +116,29 @@ def stock_table(path=None):
         now = time.monotonic()
         if _TABLE["rows"] is not None and _TABLE["path"] == str(path) and now - _TABLE["checked"] < RECHECK_SECONDS:
             return _TABLE["date"], _TABLE["rows"]
-        hists = D.universe(path)
-        key = tuple((t, h.last_date, len(h)) for t, h in sorted(hists.items()))
-        if _TABLE["key"] != key or _TABLE["path"] != str(path):
-            names = D.company_names(path)
-            _TABLE.update(key=key, rows=[stock_row(h, names) for h in hists.values()],
-                          date=D.market_date(hists))
+        sig = data_signature(path)
+        if _TABLE["key"] != sig or _TABLE["path"] != str(path):
+            saved = _load_saved_table(path, sig)
+            if saved is not None:
+                date, rows = saved
+            else:
+                hists = D.universe(path)
+                names = D.company_names(path)
+                rows = [stock_row(h, names) for h in hists.values()]
+                date = D.market_date(hists)
+            _TABLE.update(key=sig, rows=rows, date=date)
         _TABLE.update(checked=time.monotonic(), path=str(path))
         return _TABLE["date"], _TABLE["rows"]
+
+
+def write_table(path=None):
+    """Save the current table with the data signature it was built from (run daily)."""
+    date, rows = stock_table(path)
+    f = _table_path(path)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps({"date": date, "signature": data_signature(path), "rows": rows},
+                            separators=(",", ":"), allow_nan=False), encoding="utf-8")
+    return f
 
 
 def _median(values):
