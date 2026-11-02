@@ -208,6 +208,7 @@ def explain_ticker(rows, models_dir, drop_cols=DROP_COLS, lstm_sectors=LSTM_SECT
         "sector": sector, "as_of": as_of, "method": method,
         "model_type": "LSTM" if is_lstm else "XGBoost",
         "signal": labels[int(max(range(3), key=lambda i: probs[i]))],
+        "probabilities": {labels[i]: round(float(probs[i]), 4) for i in range(3)},
         "score": round(score, 3), "baseline": round(baseline, 3), "compared_with": compared,
         "drivers": top_drivers(attr, feature_cols, values, k=8),
     }

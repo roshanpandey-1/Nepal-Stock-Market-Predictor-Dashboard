@@ -31,6 +31,11 @@ SEQ_LEN, DROP_COLS, LSTM_SECTORS = explain.SEQ_LEN, explain.DROP_COLS, explain.L
 LABELS = {0: "Sell", 1: "Hold", 2: "Buy"}
 
 
+def explain_ticker_ok(ticker):
+    import re
+    return bool(re.fullmatch(r"[A-Z0-9]{1,15}", ticker or ""))
+
+
 def _read_feature_rows(ticker):
     path = PROCESSED_DIR / f"{ticker}_features.csv"
     if not path.exists():
@@ -123,12 +128,50 @@ def price_forecast(ticker):
     })
 
 
+def _live_scoring_allowed():
+    """Whether a web request may load a model itself. Off on Render: loading PyTorch and a
+    model per request (the watchlist asks for many at once) exceeded the free plan's 512 MB.
+    There the signal comes from models/explanations.json, which the daily workflow builds by
+    running the same models on the same latest rows. Locally it stays on as a fallback."""
+    default = "0" if os.environ.get("RENDER") else "1"
+    return os.environ.get("LIVE_MODEL_SCORING", default) == "1"
+
+
+def _precomputed_signal(ticker):
+    item = explain.load_explanations(MODELS_DIR).get("stocks", {}).get(ticker)
+    if not item or "error" in item or item.get("signal") not in LABELS.values():
+        return None
+    probs = item.get("probabilities") or None
+    reliability = model_evidence.assess(model_evidence.for_sector(item.get("sector")))
+    return {
+        "ticker": ticker,
+        "sector": item.get("sector"),
+        "signal": item["signal"],
+        "confidence": round(max(probs.values()), 4) if probs else None,
+        "probabilities": probs,
+        "reliability": reliability,
+        "note": reliability["headline"],
+        "as_of": item.get("as_of"),
+        "source": "precomputed",
+    }
+
+
 @api.route("/signal/<ticker>")
 def signal(ticker):
     ticker = ticker.upper()
+    if not explain_ticker_ok(ticker):
+        return jsonify({"ticker": ticker, "signal": None, "error": "ticker not found"}), 404
     rows = _read_feature_rows(ticker)
     if not rows:
         return jsonify({"ticker": ticker, "signal": None, "error": "ticker not found"}), 404
+
+    live = _live_scoring_allowed()
+    pre = _precomputed_signal(ticker)
+    if pre is not None and (not live or pre["as_of"] == (rows[-1].get("Date") or "")[:10]):
+        return jsonify(pre)
+    if not live:
+        return jsonify({"ticker": ticker, "signal": None,
+                        "error": "The signal for this stock has not been computed yet."}), 200
 
     sector = rows[0].get("Sector")
     sector_name = sector.replace(" ", "_").replace("/", "_") if sector else None

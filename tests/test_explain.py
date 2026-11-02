@@ -63,6 +63,9 @@ def test_explain_ticker_with_the_deployed_models(ticker, model_type):
     assert d["model_type"] == model_type and d["signal"] in ("Buy", "Sell", "Hold")
     assert len(d["drivers"]) == 8 and sum(x["share_pct"] for x in d["drivers"]) <= 100.01
     assert d["as_of"] == rows[-1]["Date"]
+    p = d["probabilities"]
+    assert set(p) == {"Sell", "Hold", "Buy"} and sum(p.values()) == pytest.approx(1, abs=0.01)
+    assert max(p, key=p.get) == d["signal"]
 
 
 @pytest.fixture
@@ -138,3 +141,48 @@ def test_explain_without_the_file_says_so(client, monkeypatch, tmp_path):
     explain._FILE_CACHE.update(key=None, data={})
     d = client.get("/api/explain/CHCL").get_json()
     assert "not been built" in d["error"]
+
+
+# ---------------- /api/signal on Render: read the prebuilt file, never load a model ----------------
+def test_signal_comes_from_the_prebuilt_file_when_live_scoring_is_off(client, monkeypatch, tmp_path):
+    import json
+    monkeypatch.setenv("LIVE_MODEL_SCORING", "0")
+    data = REPO / "deploy_data"
+    shipped = json.loads((data / "models" / "explanations.json").read_text(encoding="utf-8"))
+    shipped["stocks"]["CHCL"]["probabilities"] = {"Sell": 0.1, "Hold": 0.7, "Buy": 0.2}
+    shipped["stocks"]["CHCL"]["signal"] = "Hold"
+    (tmp_path / "explanations.json").write_text(json.dumps(shipped), encoding="utf-8")
+    from app.backend import api
+    monkeypatch.setattr(api, "MODELS_DIR", tmp_path)
+    import builtins
+    real_import = builtins.__import__
+    def no_torch(name, *a, **k):
+        if name == "torch" or name.startswith("torch."):
+            raise AssertionError("the web request must not import torch")
+        return real_import(name, *a, **k)
+    monkeypatch.setattr(builtins, "__import__", no_torch)
+    d = client.get("/api/signal/CHCL").get_json()
+    assert d["signal"] == "Hold" and d["source"] == "precomputed" and d["confidence"] == 0.7
+    assert d["reliability"]["level"] in ("no_edge", "unproven", "tested", "unknown")
+    hdl = client.get("/api/signal/HDL").get_json()                 # older file without probabilities still works
+    assert hdl["signal"] in ("Buy", "Sell", "Hold") and hdl["source"] == "precomputed"
+    assert (hdl["probabilities"] is None) == (hdl["confidence"] is None)
+
+
+def test_signal_without_a_prebuilt_entry_says_so_instead_of_loading_a_model(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("LIVE_MODEL_SCORING", "0")
+    from app.backend import api
+    (tmp_path / "explanations.json").write_text('{"generated": "x", "stocks": {}}', encoding="utf-8")
+    monkeypatch.setattr(api, "MODELS_DIR", tmp_path)
+    d = client.get("/api/signal/CHCL").get_json()
+    assert d["signal"] is None and "not been computed" in d["error"]
+    assert client.get("/api/signal/..%2Fx").status_code == 404
+
+
+def test_live_scoring_is_off_by_default_on_render(monkeypatch):
+    from app.backend import api
+    monkeypatch.delenv("LIVE_MODEL_SCORING", raising=False)
+    monkeypatch.setenv("RENDER", "true")
+    assert api._live_scoring_allowed() is False
+    monkeypatch.delenv("RENDER")
+    assert api._live_scoring_allowed() is True
